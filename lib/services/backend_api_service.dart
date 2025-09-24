@@ -1,10 +1,24 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/report.dart';
+import '../core/config/environment_switcher.dart';
 
 class BackendApiService {
-  // Backend API base URL - change this to your server's IP if running on different machine
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  // Initialize configuration on first use
+  static bool _configInitialized = false;
+  
+  static void _initializeConfig() {
+    if (!_configInitialized) {
+      EnvironmentSwitcher.printConfiguration();
+      _configInitialized = true;
+    }
+  }
+  
+  // Get base URL from configuration
+  static String get baseUrl {
+    _initializeConfig();
+    return EnvironmentSwitcher.baseUrl;
+  }
 
   // Headers for API requests
   static const Map<String, String> headers = {
@@ -16,6 +30,7 @@ class BackendApiService {
   Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
       print('🔐 Attempting login for: $email');
+      print('🌐 Using server: $baseUrl');
 
       final response = await http
           .post(
@@ -23,7 +38,7 @@ class BackendApiService {
             headers: headers,
             body: jsonEncode({'email': email, 'password': password}),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(EnvironmentSwitcher.timeout);
 
       print('🔍 Login response status: ${response.statusCode}');
 
