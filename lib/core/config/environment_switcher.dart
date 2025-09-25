@@ -24,8 +24,8 @@ class EnvironmentSwitcher {
     ),
   };
   
-  // Current environment (defaults to development for testing)
-  static String _currentEnvironment = 'development';
+  // Current environment (defaults to production for mobile deployment)
+  static String _currentEnvironment = 'production';
   
   // Initialize environment from storage
   static Future<void> initialize() async {

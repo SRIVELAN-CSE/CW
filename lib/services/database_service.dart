@@ -8,6 +8,7 @@ import '../models/need_request.dart';
 import '../models/feedback.dart';
 import '../models/certificate.dart';
 import '../core/utils/web_storage.dart';
+import '../core/config/environment_switcher.dart';
 import 'backend_api_service.dart';
 
 class DatabaseService {
@@ -41,6 +42,8 @@ class DatabaseService {
   ) async {
     try {
       print('[AUTH] Attempting live authentication for: $email');
+      print('[AUTH] Environment: ${EnvironmentSwitcher.currentEnvironment}');
+      print('[AUTH] API URL: ${EnvironmentSwitcher.baseUrl}');
 
       final response = await _backendApi.login(email, password);
 
@@ -56,14 +59,15 @@ class DatabaseService {
           userId: userInfo['id'],
           userName: userInfo['name'],
           userEmail: userInfo['email'],
-          userRole: userInfo['user_type'],
+          userRole: userInfo['userType'],
           department: userInfo['department'],
         );
 
         print('[SUCCESS] Live authentication successful!');
-        print('User: ${userInfo['name']} (${userInfo['user_type']})');
+        print('User: ${userInfo['name']} (${userInfo['userType']})');
         print('Department: ${userInfo['department']}');
-        print('Full user info: $userInfo');
+        print('Environment: ${EnvironmentSwitcher.currentEnvironment}');
+        print('✅ Connected to ${EnvironmentSwitcher.isProduction ? 'CLOUD' : 'LOCAL'} database');
 
         return {'success': true, 'user': userInfo, 'token': token};
       }
@@ -88,6 +92,8 @@ class DatabaseService {
   }) async {
     try {
       print('[REGISTER] Registering new user: $email');
+      print('[REGISTER] Environment: ${EnvironmentSwitcher.currentEnvironment}');
+      print('[REGISTER] API URL: ${EnvironmentSwitcher.baseUrl}');
 
       final response = await _backendApi.register(
         name: name,
@@ -102,6 +108,7 @@ class DatabaseService {
       if (response != null) {
         print('[SUCCESS] User registered successfully!');
         print('New user: $name ($userType)');
+        print('✅ Data saved to ${EnvironmentSwitcher.isProduction ? 'CLOUD' : 'LOCAL'} database');
         return true;
       }
 
@@ -293,21 +300,21 @@ class DatabaseService {
         await prefs.setString(_reportsKey, jsonEncode(reportsJson));
       }
 
-      // NEW: Also save to backend database
+      // PRIMARY: Save to backend database (cloud/local server)
       try {
-        print('🔍 [BACKEND] Attempting to save report to backend database...');
+        print('🔍 [BACKEND] Saving report to ${EnvironmentSwitcher.currentEnvironment} database...');
+        print('🌐 [BACKEND] Using server: ${EnvironmentSwitcher.baseUrl}');
+        
         final backendResult = await BackendApiService.createReport(report);
         if (backendResult != null) {
-          print('✅ [BACKEND] Report successfully saved to SQLite database!');
+          print('✅ [BACKEND] Report successfully saved to ${EnvironmentSwitcher.isProduction ? 'CLOUD' : 'LOCAL'} database!');
           print('🔍 [BACKEND] Backend Report ID: ${backendResult['id']}');
         } else {
-          print(
-            '⚠️ [BACKEND] Failed to save to backend, but local save succeeded',
-          );
+          print('⚠️ [BACKEND] Failed to save to backend, but local cache succeeded');
         }
       } catch (e) {
-        print('⚠️ [BACKEND] Backend save failed (will retry later): $e');
-        // Don't throw error - local save still succeeded
+        print('⚠️ [BACKEND] Backend save failed: $e');
+        print('ℹ️ [BACKEND] Data is cached locally and will sync when connection is restored');
       }
 
       // Create notification for officers and admins

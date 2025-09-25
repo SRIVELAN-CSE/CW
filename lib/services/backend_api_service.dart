@@ -4,20 +4,14 @@ import '../models/report.dart';
 import '../core/config/environment_switcher.dart';
 
 class BackendApiService {
-  // Initialize configuration on first use
-  static bool _configInitialized = false;
-  
-  static void _initializeConfig() {
-    if (!_configInitialized) {
-      EnvironmentSwitcher.printConfiguration();
-      _configInitialized = true;
-    }
+  // Get base URL from current environment configuration
+  static String get baseUrl {
+    return EnvironmentSwitcher.baseUrl;
   }
   
-  // Get base URL from configuration
-  static String get baseUrl {
-    _initializeConfig();
-    return EnvironmentSwitcher.baseUrl;
+  // Get timeout from environment configuration
+  static Duration get timeout {
+    return EnvironmentSwitcher.timeout;
   }
 
   // Headers for API requests
@@ -31,6 +25,7 @@ class BackendApiService {
     try {
       print('🔐 Attempting login for: $email');
       print('🌐 Using server: $baseUrl');
+      print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
 
       final response = await http
           .post(
@@ -38,14 +33,14 @@ class BackendApiService {
             headers: headers,
             body: jsonEncode({'email': email, 'password': password}),
           )
-          .timeout(EnvironmentSwitcher.timeout);
+          .timeout(timeout);
 
       print('🔍 Login response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Login successful!');
-        return data;
+        print('✅ Login successful! (${EnvironmentSwitcher.currentEnvironment})');
+        return data['data'];
       } else {
         print('❌ Login failed: ${response.body}');
         return null;
@@ -68,6 +63,8 @@ class BackendApiService {
   }) async {
     try {
       print('📝 Registering user: $email');
+      print('🌐 Using server: $baseUrl');
+      print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
 
       final response = await http
           .post(
@@ -79,18 +76,18 @@ class BackendApiService {
               'password': password,
               'phone': phone,
               'location': location,
-              'user_type': userType.toLowerCase(),
+              'userType': userType.toLowerCase(),
               'department': department ?? 'others',
             }),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(timeout);
 
       print('🔍 Registration response status: ${response.statusCode}');
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        print('✅ Registration successful!');
-        return data;
+        print('✅ Registration successful! (${EnvironmentSwitcher.currentEnvironment})');
+        return data['data'];
       } else {
         print('❌ Registration failed: ${response.body}');
         return null;
@@ -104,11 +101,17 @@ class BackendApiService {
   /// Test if backend server is running
   static Future<bool> testConnection() async {
     try {
+      print('🔍 Testing connection to: $baseUrl');
+      print('🔧 Current environment: ${EnvironmentSwitcher.currentEnvironment}');
+      
+      final healthUrl = baseUrl.replaceAll('/api', '/api/health');
       final response = await http
-          .get(Uri.parse('$baseUrl/../health'), headers: headers)
-          .timeout(const Duration(seconds: 5));
+          .get(Uri.parse(healthUrl), headers: headers)
+          .timeout(const Duration(seconds: 10));
 
-      return response.statusCode == 200;
+      final success = response.statusCode == 200;
+      print(success ? '✅ Backend connection successful!' : '❌ Backend connection failed!');
+      return success;
     } catch (e) {
       print('🔍 Backend connection test failed: $e');
       return false;

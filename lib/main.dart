@@ -12,10 +12,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   print('🚀 Starting CivicWelfare App...');
-  print('📱 Running in local storage mode');
   
-  // Initialize environment switcher
+  // Initialize environment switcher first
   await EnvironmentSwitcher.initialize();
+  
+  // Print current configuration
+  print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
+  print('🌐 API Base URL: ${EnvironmentSwitcher.baseUrl}');
+  print('🔗 Socket URL: ${EnvironmentSwitcher.socketUrl}');
   
   runApp(const MyApp());
 }

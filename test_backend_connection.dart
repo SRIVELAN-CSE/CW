@@ -31,7 +31,6 @@ void main() async {
       'email': 'flutter-test-${DateTime.now().millisecondsSinceEpoch}@example.com',
       'phone': '1234567890',
       'password': 'flutter123',
-      'confirmPassword': 'flutter123',
       'userType': 'public',
       'location': 'Flutter Test City'
     };
