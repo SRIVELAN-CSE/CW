@@ -5,12 +5,17 @@ import 'screens/public/public_dashboard_screen.dart';
 import 'screens/officer/officer_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'core/utils/storage_debugger.dart';
+import 'core/config/environment_switcher.dart';
+import 'core/config/startup_environment_selector.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   print('🚀 Starting CivicWelfare App...');
   print('📱 Running in local storage mode');
+  
+  // Initialize environment switcher
+  await EnvironmentSwitcher.initialize();
   
   runApp(const MyApp());
 }
@@ -54,17 +59,30 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _environmentSelected = false;
+  
   @override
   void initState() {
     super.initState();
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    // Wait for environment to be initialized
+    await EnvironmentSwitcher.initialize();
+    
+    // Show environment selector first if not selected
+    setState(() {
+      _environmentSelected = true;
+    });
+    
+    // Continue with app initialization after a delay
+    await Future.delayed(const Duration(milliseconds: 500));
     _checkUserSession();
   }
 
   Future<void> _checkUserSession() async {
     try {
-      // Wait a moment for the app to fully initialize
-      await Future.delayed(const Duration(milliseconds: 500));
-      
       // Debug localStorage functionality
       print('🔍 Testing localStorage functionality...');
       StorageDebugger.testLocalStorage();
@@ -134,6 +152,19 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Show environment selector if not selected
+    if (!_environmentSelected) {
+      return StartupEnvironmentSelector(
+        onEnvironmentSelected: (env) {
+          setState(() {
+            _environmentSelected = true;
+          });
+          _checkUserSession();
+        },
+      );
+    }
+    
+    // Show splash screen after environment is selected
     return Scaffold(
       body: Container(
         width: double.infinity,

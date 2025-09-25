@@ -96,8 +96,66 @@ const optionalAuth = async (req, res, next) => {
   }
 };
 
+// Admin-only authentication (STRICT - only the default admin can access)
+const authenticateAdmin = async (req, res, next) => {
+  try {
+    let token;
+
+    // Check for token in Authorization header
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Access denied. Admin authentication required.'
+      });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Get user from database
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token. User not found.'
+      });
+    }
+
+    // STRICT ADMIN CHECK: Must be admin type AND the default admin email
+    if (user.userType !== 'admin' || user.email !== 'admin@civicwelfare.com') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only the system administrator can access this resource.'
+      });
+    }
+
+    if (!user.isActive || !user.isVerified) {
+      return res.status(401).json({
+        success: false,
+        message: 'Admin account is not active or verified.'
+      });
+    }
+
+    // Add user to request object
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Admin authentication error:', error);
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid admin token.'
+    });
+  }
+};
+
 module.exports = {
   authenticate,
   authorize,
-  optionalAuth
+  optionalAuth,
+  authenticateAdmin
 };

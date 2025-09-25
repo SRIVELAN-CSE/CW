@@ -67,7 +67,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Indexes for better query performance
-userSchema.index({ email: 1 });
+// Note: email index is automatically created by unique constraint
 userSchema.index({ userType: 1 });
 userSchema.index({ department: 1 });
 userSchema.index({ isActive: 1 });

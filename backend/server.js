@@ -6,8 +6,22 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
+const mongoose = require('mongoose');
 
 require('dotenv').config();
+
+// CORS allowed origins
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+  'https://civic-welfare-backend.onrender.com'
+];
+
+if (process.env.CORS_ORIGIN) {
+  allowedOrigins.push(...process.env.CORS_ORIGIN.split(','));
+}
 
 // Import database connection
 const connectDB = require('./config/database');
@@ -22,6 +36,7 @@ const passwordResetRoutes = require('./routes/passwordReset');
 const needRequestRoutes = require('./routes/needRequests');
 const certificateRoutes = require('./routes/certificates');
 const feedbackRoutes = require('./routes/feedback');
+const docsRoutes = require('./routes/docs');
 
 // Import middleware
 const { authenticate, authorize } = require('./middleware/auth');
@@ -31,13 +46,14 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ["http://localhost:3000"],
-    methods: ["GET", "POST"]
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB - this will be called in startServer()
+// connectDB();
 
 // Security middleware
 app.use(helmet());
@@ -54,10 +70,20 @@ app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ["http://localhost:3000", "http://127.0.0.1:3000"],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    } else {
+      console.log(`🚫 CORS blocked origin: ${origin}`);
+      return callback(null, true); // Allow all for development
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with']
 }));
 
 // Body parsing middleware
@@ -122,6 +148,7 @@ app.get('/', (req, res) => {
 });
 
 // API routes
+app.use('/api/docs', docsRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
@@ -143,12 +170,44 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-  console.log(`🚀 CivicWelfare Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`📚 API Documentation: http://localhost:${PORT}/api/docs`);
-});
+// Start server only after database connection is established
+const startServer = async () => {
+  try {
+    // Wait for database connection
+    await connectDB();
+    
+    // Start HTTP server
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 CivicWelfare Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+      console.log(`🌐 Server accessible at: http://localhost:${PORT}`);
+      console.log(`📚 API Documentation: http://localhost:${PORT}/api/docs`);
+      
+      // Check MongoDB connection status
+      const dbStatus = mongoose.connection.readyState;
+      const dbStatusMap = {
+        0: 'Disconnected',
+        1: 'Connected',
+        2: 'Connecting',
+        3: 'Disconnecting'
+      };
+      
+      console.log(`🔗 MongoDB Status: ${dbStatusMap[dbStatus]} ${dbStatus === 1 ? '✅' : '❌'}`);
+      
+      if (dbStatus === 1) {
+        console.log(`📂 Database: ${mongoose.connection.name}`);
+        console.log(`📡 Host: ${mongoose.connection.host}`);
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
 
 module.exports = app;

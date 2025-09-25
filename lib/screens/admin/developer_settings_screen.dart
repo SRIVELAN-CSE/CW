@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/api_config.dart';
+import '../../core/config/environment_switcher_widget.dart';
 
 class DeveloperSettingsScreen extends StatefulWidget {
   const DeveloperSettingsScreen({super.key});
@@ -10,7 +11,6 @@ class DeveloperSettingsScreen extends StatefulWidget {
 }
 
 class _DeveloperSettingsScreenState extends State<DeveloperSettingsScreen> {
-  String _selectedEnvironment = ApiConfig.currentEnvironment;
   bool _showDebugInfo = false;
 
   @override
@@ -52,93 +52,11 @@ class _DeveloperSettingsScreenState extends State<DeveloperSettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Server Environment Section
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.cloud, color: Colors.blue),
-                        SizedBox(width: 8),
-                        Text(
-                          'Server Environment',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Development Option
-                    RadioListTile<String>(
-                      title: const Text('🏠 Localhost Development'),
-                      subtitle: const Text('http://localhost:3000/api'),
-                      value: 'development',
-                      groupValue: _selectedEnvironment,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedEnvironment = value!;
-                        });
-                      },
-                    ),
-                    
-                    // Production Option
-                    RadioListTile<String>(
-                      title: const Text('☁️ Render.com Production'),
-                      subtitle: const Text('https://civic-welfare-backend.onrender.com/api'),
-                      value: 'production',
-                      groupValue: _selectedEnvironment,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedEnvironment = value!;
-                        });
-                      },
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    // Status Indicator
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: _selectedEnvironment == 'development' 
-                            ? Colors.green.shade50 
-                            : Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _selectedEnvironment == 'development' 
-                              ? Colors.green 
-                              : Colors.blue,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _selectedEnvironment == 'development' 
-                                ? Icons.computer 
-                                : Icons.cloud_done,
-                            color: _selectedEnvironment == 'development' 
-                                ? Colors.green 
-                                : Colors.blue,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Currently using: ${_selectedEnvironment == 'development' ? 'Local Server' : 'Cloud Server'}',
-                            style: TextStyle(
-                              color: _selectedEnvironment == 'development' 
-                                  ? Colors.green.shade800 
-                                  : Colors.blue.shade800,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            // New Environment Switcher Widget
+            EnvironmentSwitcherWidget(
+              onEnvironmentChanged: (env) {
+                // Environment switched, could trigger app restart if needed
+              },
             ),
             
             const SizedBox(height: 16),

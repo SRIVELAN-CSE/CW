@@ -15,12 +15,12 @@ Set these in Render dashboard:
 NODE_ENV=production
 PORT=10000
 MONGODB_URI=mongodb+srv://srivelansv2006_db_user:9YxxIF6TGmNQEsNg@civic-welfare-cluster.rts6zvy.mongodb.net/civic_welfare?retryWrites=true&w=majority&appName=civic-welfare-cluster
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+JWT_SECRET=a7f3b8c2e9d1f4a6b8c3e7f2a9d4b6c8e1f5a3b7c9d2e6f8a1b4c7e9f2a5b8c1e4f7
 JWT_EXPIRE=7d
-CORS_ORIGIN=https://your-frontend-domain.com
+CORS_ORIGIN=https://civic-welfare-backend.onrender.com
 EMAIL_SERVICE=gmail
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASSWORD=your-app-specific-password
+EMAIL_USER=your-citivoice6@gmail.com
+EMAIL_PASSWORD=CitiVoice@teamof6
 ```
 
 ## Health Check

@@ -2,10 +2,21 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
+    // Set mongoose options for better connection handling
+    const options = {
+      bufferCommands: false,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    };
 
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log('🔍 Connecting to MongoDB...');
+    const conn = await mongoose.connect(process.env.MONGODB_URI, options);
+
+    console.log(`✅ MongoDB Connected Successfully!`);
     console.log(`📂 Database: ${conn.connection.name}`);
+    console.log(`🌐 Host: ${conn.connection.host}`);
+    console.log(`� Connection State: ${conn.connection.readyState === 1 ? 'Ready' : 'Not Ready'}`);
 
     // Handle connection events
     mongoose.connection.on('connected', () => {
@@ -17,7 +28,7 @@ const connectDB = async () => {
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.log('📴 Mongoose disconnected');
+      console.log('📴 Mongoose disconnected from MongoDB');
     });
 
     // Graceful shutdown
@@ -27,8 +38,11 @@ const connectDB = async () => {
       process.exit(0);
     });
 
+    return conn;
+
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);
+    console.error('   Connection string:', process.env.MONGODB_URI ? 'Provided' : 'Missing');
     process.exit(1);
   }
 };

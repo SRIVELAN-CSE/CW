@@ -144,7 +144,7 @@ const certificateSchema = new mongoose.Schema({
 });
 
 // Indexes for better query performance
-certificateSchema.index({ applicationNumber: 1 });
+// Note: applicationNumber index is automatically created by unique constraint
 certificateSchema.index({ certificateType: 1 });
 certificateSchema.index({ status: 1 });
 certificateSchema.index({ applicantId: 1 });
