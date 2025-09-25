@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/report.dart';
 import '../core/config/environment_switcher.dart';
+import 'database_service.dart';
 
 class BackendApiService {
   // Get base URL from current environment configuration
@@ -19,6 +20,16 @@ class BackendApiService {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
+
+  // Get authenticated headers with token
+  static Future<Map<String, String>> getAuthenticatedHeaders() async {
+    final token = await DatabaseService.instance.getAuthToken();
+    final authHeaders = Map<String, String>.from(headers);
+    if (token != null) {
+      authHeaders['Authorization'] = 'Bearer $token';
+    }
+    return authHeaders;
+  }
 
   /// 🔐 AUTHENTICATE USER (LOGIN)
   Future<Map<String, dynamic>?> login(String email, String password) async {
@@ -123,6 +134,9 @@ class BackendApiService {
     try {
       print('🔍 Sending report to backend database...');
 
+      // Get authenticated headers with token
+      final authHeaders = await getAuthenticatedHeaders();
+
       // Prepare report data for API
       final reportData = {
         'title': report.title,
@@ -142,7 +156,7 @@ class BackendApiService {
       final response = await http
           .post(
             Uri.parse('$baseUrl/reports/'),
-            headers: headers,
+            headers: authHeaders,
             body: json.encode(reportData),
           )
           .timeout(const Duration(seconds: 10));
@@ -167,14 +181,23 @@ class BackendApiService {
     try {
       print('🔍 Fetching reports from backend database...');
 
+      final authHeaders = await getAuthenticatedHeaders();
       final response = await http
-          .get(Uri.parse('$baseUrl/reports/'), headers: headers)
+          .get(Uri.parse('$baseUrl/reports/'), headers: authHeaders)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        print('✅ Fetched ${data.length} reports from backend');
-        return data.cast<Map<String, dynamic>>();
+        final responseData = json.decode(response.body);
+        
+        // Handle backend response format: {success: true, data: {reports: [...], pagination: {...}}}
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final List<dynamic> reports = responseData['data']['reports'] ?? [];
+          print('✅ Fetched ${reports.length} reports from backend');
+          return reports.cast<Map<String, dynamic>>();
+        } else {
+          print('❌ Invalid response format from backend');
+          return [];
+        }
       } else {
         print('❌ Failed to fetch reports: ${response.statusCode}');
         return [];

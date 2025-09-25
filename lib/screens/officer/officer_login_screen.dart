@@ -3,6 +3,7 @@ import 'officer_dashboard_screen.dart';
 import 'officer_forgot_password_screen.dart';
 import '../../services/database_service.dart';
 import '../auth/officer_registration_screen.dart';
+import '../../core/config/environment_switcher.dart';
 
 class OfficerLoginScreen extends StatefulWidget {
   const OfficerLoginScreen({super.key});
@@ -35,75 +36,32 @@ class _OfficerLoginScreenState extends State<OfficerLoginScreen> {
         final email = _officerIdController.text.trim();
         final password = _passwordController.text.trim();
 
-        // Authenticate officer with backend (live data)
-        final authResult = await DatabaseService.instance.authenticateUser(
-          email,
-          password,
-        );
-
-        if (authResult == null || !authResult['success']) {
-          // Try fallback to local validation for offline mode
-          final user = await DatabaseService.instance.validateUserLogin(
-            email,
-            password,
+        // Use BACKEND authentication for officers
+        final authResult = await DatabaseService.instance.authenticateUser(email, password);
+        
+        if (authResult == null || authResult['success'] != true) {
+          _showStatusDialog(
+            'Login Failed',
+            'Invalid officer credentials. Please check your email and password.\n\nMake sure you are connected to the internet for authentication.',
+            'invalid_credentials',
           );
-
-          if (user == null) {
-            // Check if user exists but password is wrong
-            final hasExistingRegistration = await DatabaseService.instance
-                .hasExistingRegistration(email);
-
-            if (hasExistingRegistration) {
-              _showStatusDialog(
-                'Login Failed',
-                'Invalid email or password. Please check your credentials and try again.',
-                'invalid_credentials',
-              );
-            } else {
-              _showStatusDialog(
-                'Account Not Found',
-                'No officer account found for this email address. Please contact admin for account creation.',
-                'not_found',
-              );
-            }
-            return;
-          }
-
-          // Check if user is actually an officer
-          if (user.userType != 'officer') {
-            _showStatusDialog(
-              'Access Denied',
-              'This account is not registered as an officer. Please use the appropriate login portal.',
-              'wrong_type',
-            );
-            return;
-          }
-
-          // Save user session (fallback mode)
-          await DatabaseService.instance.saveUserSession(
-            userId: user.id,
-            userName: user.fullName,
-            userEmail: user.email,
-            userRole: user.userType,
-            department: user.department,
-          );
-        } else {
-          // Backend authentication successful
-          final userInfo = authResult['user'];
-
-          // Check if user is actually an officer
-          if (userInfo['user_type'] != 'officer') {
-            _showStatusDialog(
-              'Access Denied',
-              'This account is not registered as an officer. Please use the appropriate login portal.',
-              'wrong_type',
-            );
-            return;
-          }
-
-          // User session already saved in authenticateUser method
-          print('✅ Officer login successful with live backend data');
+          return;
         }
+
+        final user = authResult['user'];
+        
+        // Check if user is actually an officer
+        if (user['userType']?.toLowerCase() != 'officer') {
+          _showStatusDialog(
+            'Access Denied',
+            'This account is not registered as an officer. Please use the appropriate login portal.',
+            'wrong_type',
+          );
+          return;
+        }
+
+        print('✅ Officer login successful - User: ${user['name']} (${user['userType']})');
+        print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
 
         // Navigate to officer dashboard
         Navigator.pushReplacement(

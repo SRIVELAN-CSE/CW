@@ -7,6 +7,7 @@ import '../../models/registration_request.dart';
 import 'registration_management_screen.dart';
 import 'password_reset_management_screen.dart';
 import 'admin_need_management_screen.dart';
+import 'developer_settings_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -1979,6 +1980,24 @@ class AdminSettingsScreen extends StatelessWidget {
                       subtitle: 'Monitor system performance and resources',
                       icon: Icons.speed,
                       onTap: () {},
+                    ),
+                  ],
+                ),
+                _SettingsSection(
+                  title: 'Developer Tools',
+                  items: [
+                    _SettingsItem(
+                      title: 'Developer Settings',
+                      subtitle: 'Switch between local and cloud servers',
+                      icon: Icons.developer_mode,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const DeveloperSettingsScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

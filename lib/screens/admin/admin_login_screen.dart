@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'admin_dashboard_screen.dart';
+import '../../services/database_service.dart';
+import '../../core/config/environment_switcher.dart';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -30,24 +32,81 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         _isLoading = true;
       });
 
-      // Simulate API call
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-          // TODO: Replace with real authentication logic
-          // For now, always navigate to dashboard for testing
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AdminDashboardScreen(),
-            ),
+      try {
+        // Use Admin ID as email for backend authentication
+        final adminEmail = _adminIdController.text.trim();
+        final password = _passwordController.text.trim();
+        
+        // For admin authentication, we can use admin@civicwelfare.com
+        // or the entered admin ID if it contains @
+        final email = adminEmail.contains('@') ? adminEmail : 'admin@civicwelfare.com';
+        
+        // Backend authentication
+        final authResult = await DatabaseService.instance.authenticateUser(email, password);
+        
+        if (authResult == null || authResult['success'] != true) {
+          _showErrorDialog(
+            'Admin Authentication Failed',
+            'Invalid administrator credentials. Please check your Admin ID, password, and security code.\n\nMake sure you are connected to the internet for authentication.',
           );
+          return;
+        }
+
+        final user = authResult['user'];
+        
+        // Verify admin role
+        if (user['userType']?.toLowerCase() != 'admin') {
+          _showErrorDialog(
+            'Access Denied',
+            'This account does not have administrator privileges.',
+          );
+          return;
+        }
+
+        print('✅ Admin login successful - User: ${user['name']}');
+        print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
+
+        // Navigate to admin dashboard
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const AdminDashboardScreen(),
+          ),
+        );
+        
+      } catch (e) {
+        _showErrorDialog(
+          'Login Error',
+          'An error occurred during admin login: $e',
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
