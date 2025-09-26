@@ -75,6 +75,13 @@ const reportSchemas = {
     latitude: Joi.number().min(-90).max(90),
     longitude: Joi.number().min(-180).max(180),
     priority: Joi.string().valid('Low', 'Medium', 'High', 'Critical').default('Medium'),
+    department: Joi.string().valid('garbageCollection', 'drainage', 'roadMaintenance', 'streetLights', 'waterSupply', 'others', 'General Services').default('others'),
+    estimatedResolutionTime: Joi.string().trim(),
+    departmentContact: Joi.object({
+      name: Joi.string(),
+      phone: Joi.string(),
+      email: Joi.string().email()
+    }),
     imageUrls: Joi.array().items(Joi.string().uri()),
     videoUrls: Joi.array().items(Joi.string().uri()),
     tags: Joi.array().items(Joi.string().trim())

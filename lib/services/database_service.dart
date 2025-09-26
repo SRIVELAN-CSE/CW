@@ -9,6 +9,7 @@ import '../models/feedback.dart';
 import '../models/certificate.dart';
 import '../core/utils/web_storage.dart';
 import '../core/config/environment_switcher.dart';
+import '../core/services/connection_manager.dart';
 import 'backend_api_service.dart';
 
 class DatabaseService {
@@ -44,6 +45,15 @@ class DatabaseService {
       print('[AUTH] Attempting live authentication for: $email');
       print('[AUTH] Environment: ${EnvironmentSwitcher.currentEnvironment}');
       print('[AUTH] Backend URL: ${EnvironmentSwitcher.baseUrl}');
+
+      // Test backend connection first
+      print('[CONN] Testing backend connection...');
+      await ConnectionManager.wakeUpRenderService();
+      
+      if (!await ConnectionManager.testBackendConnection(maxRetries: 3)) {
+        print('[ERROR] Backend connection failed - falling back to local auth');
+        return null;
+      }
 
       final response = await _backendApi.login(email, password);
 

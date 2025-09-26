@@ -37,7 +37,10 @@ class BackendApiService {
   /// 🔐 AUTHENTICATE USER (LOGIN)
   Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
+      await EnvironmentSwitcher.initialize();
       print('🔐 Attempting login for: $email');
+      print('🌐 Using server: $baseUrl');
+      print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
 
       final response = await http
           .post(
@@ -45,13 +48,14 @@ class BackendApiService {
             headers: headers,
             body: jsonEncode({'email': email, 'password': password}),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 15));
 
       print('🔍 Login response status: ${response.statusCode}');
+      print('🔍 Login response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Login successful!');
+        print('✅ Login successful with ${EnvironmentSwitcher.currentEnvironment}!');
         return data;
       } else {
         print('❌ Login failed: ${response.body}');
@@ -59,6 +63,7 @@ class BackendApiService {
       }
     } catch (e) {
       print('🚨 Login error: $e');
+      print('🔧 Current environment: ${EnvironmentSwitcher.currentEnvironment}');
       return null;
     }
   }

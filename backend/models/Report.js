@@ -110,7 +110,7 @@ const reportSchema = new mongoose.Schema({
   },
   department: {
     type: String,
-    enum: ['garbageCollection', 'drainage', 'roadMaintenance', 'streetLights', 'waterSupply', 'others'],
+    enum: ['garbageCollection', 'drainage', 'roadMaintenance', 'streetLights', 'waterSupply', 'others', 'General Services'],
     default: 'others'
   },
   imageUrls: [{

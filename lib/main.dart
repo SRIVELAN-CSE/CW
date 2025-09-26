@@ -5,12 +5,19 @@ import 'screens/public/public_dashboard_screen.dart';
 import 'screens/officer/officer_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'core/utils/storage_debugger.dart';
+import 'core/config/environment_switcher.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   print('🚀 Starting CivicWelfare App...');
-  print('📱 Running in local storage mode');
+  
+  // Initialize environment switcher first
+  await EnvironmentSwitcher.initialize();
+  
+  print('🌐 Environment: ${EnvironmentSwitcher.currentEnvironment}');
+  print('📡 API Base URL: ${EnvironmentSwitcher.baseUrl}');
+  print('📱 Multi-device sync ready');
   
   runApp(const MyApp());
 }

@@ -1989,9 +1989,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
             onPressed: () async {
               // Apply environment change
               if (_currentEnvironment == 'Development') {
-                EnvironmentSwitcher.switchToDevelopment();
+                await EnvironmentSwitcher.switchToDevelopment();
               } else {
-                EnvironmentSwitcher.switchToProduction();
+                await EnvironmentSwitcher.switchToProduction();
               }
               
               // Test connection
