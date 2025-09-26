@@ -4,10 +4,11 @@ import '../../services/notification_service.dart';
 import '../../models/report.dart';
 import '../../models/need_request.dart';
 import '../../models/registration_request.dart';
+import '../../core/config/environment_switcher.dart';
+import '../../services/backend_api_service.dart';
 import 'registration_management_screen.dart';
 import 'password_reset_management_screen.dart';
 import 'admin_need_management_screen.dart';
-import 'developer_settings_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -1904,8 +1905,129 @@ class AnalyticsScreen extends StatelessWidget {
 }
 
 // Admin Settings Screen
-class AdminSettingsScreen extends StatelessWidget {
+class AdminSettingsScreen extends StatefulWidget {
   const AdminSettingsScreen({super.key});
+
+  @override
+  State<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
+}
+
+class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
+  String _currentEnvironment = EnvironmentSwitcher.currentEnvironment;
+  
+  void _showEnvironmentSwitcher(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.cloud_sync, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Server Environment'),
+          ],
+        ),
+        content: StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Select the backend server environment:'),
+                const SizedBox(height: 16),
+                Card(
+                  color: _currentEnvironment == 'Development' 
+                      ? Colors.blue.shade50 
+                      : null,
+                  child: RadioListTile<String>(
+                    title: const Text('Development Server'),
+                    subtitle: Text(
+                      'Local: ${EnvironmentSwitcher.developmentBaseUrl}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: 'Development',
+                    groupValue: _currentEnvironment,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _currentEnvironment = value!;
+                      });
+                    },
+                  ),
+                ),
+                Card(
+                  color: _currentEnvironment == 'Production' 
+                      ? Colors.green.shade50 
+                      : null,
+                  child: RadioListTile<String>(
+                    title: const Text('Production Server'),
+                    subtitle: Text(
+                      'Cloud: ${EnvironmentSwitcher.productionBaseUrl}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: 'Production',
+                    groupValue: _currentEnvironment,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        _currentEnvironment = value!;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Note: This affects where your data is stored and synchronized across devices.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // Apply environment change
+              if (_currentEnvironment == 'Development') {
+                EnvironmentSwitcher.switchToDevelopment();
+              } else {
+                EnvironmentSwitcher.switchToProduction();
+              }
+              
+              // Test connection
+              bool connectionSuccess = false;
+              try {
+                connectionSuccess = await BackendApiService.testConnection();
+              } catch (e) {
+                print('Connection test failed: $e');
+              }
+              
+              Navigator.pop(context);
+              
+              // Show result
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      connectionSuccess
+                          ? 'Switched to $_currentEnvironment server successfully!'
+                          : 'Switched to $_currentEnvironment but connection failed. Check network.',
+                    ),
+                    backgroundColor: connectionSuccess ? Colors.green : Colors.orange,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+                
+                // Refresh the screen to update environment display
+                setState(() {});
+              }
+            },
+            child: const Text('Apply Changes'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1923,6 +2045,12 @@ class AdminSettingsScreen extends StatelessWidget {
                 _SettingsSection(
                   title: 'System Configuration',
                   items: [
+                    _SettingsItem(
+                      title: 'Environment Configuration',
+                      subtitle: 'Switch between Local and Cloud Server (${EnvironmentSwitcher.currentEnvironment})',
+                      icon: Icons.cloud_sync,
+                      onTap: () => _showEnvironmentSwitcher(context),
+                    ),
                     _SettingsItem(
                       title: 'General Settings',
                       subtitle: 'App name, logo, and basic configuration',
@@ -1980,24 +2108,6 @@ class AdminSettingsScreen extends StatelessWidget {
                       subtitle: 'Monitor system performance and resources',
                       icon: Icons.speed,
                       onTap: () {},
-                    ),
-                  ],
-                ),
-                _SettingsSection(
-                  title: 'Developer Tools',
-                  items: [
-                    _SettingsItem(
-                      title: 'Developer Settings',
-                      subtitle: 'Switch between local and cloud servers',
-                      icon: Icons.developer_mode,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const DeveloperSettingsScreen(),
-                          ),
-                        );
-                      },
                     ),
                   ],
                 ),

@@ -2,18 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/report.dart';
 import '../core/config/environment_switcher.dart';
-import 'database_service.dart';
 
 class BackendApiService {
-  // Get base URL from current environment configuration
-  static String get baseUrl {
-    return EnvironmentSwitcher.baseUrl;
-  }
-  
-  // Get timeout from environment configuration
-  static Duration get timeout {
-    return EnvironmentSwitcher.timeout;
-  }
+  // Dynamic base URL from environment switcher
+  static String get baseUrl => EnvironmentSwitcher.baseUrl;
 
   // Headers for API requests
   static const Map<String, String> headers = {
@@ -21,22 +13,31 @@ class BackendApiService {
     'Accept': 'application/json',
   };
 
-  // Get authenticated headers with token
-  static Future<Map<String, String>> getAuthenticatedHeaders() async {
-    final token = await DatabaseService.instance.getAuthToken();
-    final authHeaders = Map<String, String>.from(headers);
-    if (token != null) {
-      authHeaders['Authorization'] = 'Bearer $token';
+  /// Test backend connection
+  static Future<bool> testConnection() async {
+    try {
+      print('🔍 Testing connection to: $baseUrl');
+      final response = await http
+          .get(Uri.parse('$baseUrl/health'))
+          .timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        print('✅ Backend connection successful');
+        return true;
+      } else {
+        print('❌ Backend connection failed: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Backend connection error: $e');
+      return false;
     }
-    return authHeaders;
   }
 
   /// 🔐 AUTHENTICATE USER (LOGIN)
   Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
       print('🔐 Attempting login for: $email');
-      print('🌐 Using server: $baseUrl');
-      print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
 
       final response = await http
           .post(
@@ -44,14 +45,14 @@ class BackendApiService {
             headers: headers,
             body: jsonEncode({'email': email, 'password': password}),
           )
-          .timeout(timeout);
+          .timeout(const Duration(seconds: 10));
 
       print('🔍 Login response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Login successful! (${EnvironmentSwitcher.currentEnvironment})');
-        return data['data'];
+        print('✅ Login successful!');
+        return data;
       } else {
         print('❌ Login failed: ${response.body}');
         return null;
@@ -74,8 +75,6 @@ class BackendApiService {
   }) async {
     try {
       print('📝 Registering user: $email');
-      print('🌐 Using server: $baseUrl');
-      print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
 
       final response = await http
           .post(
@@ -87,18 +86,18 @@ class BackendApiService {
               'password': password,
               'phone': phone,
               'location': location,
-              'userType': userType.toLowerCase(),
+              'user_type': userType.toLowerCase(),
               'department': department ?? 'others',
             }),
           )
-          .timeout(timeout);
+          .timeout(const Duration(seconds: 10));
 
       print('🔍 Registration response status: ${response.statusCode}');
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        print('✅ Registration successful! (${EnvironmentSwitcher.currentEnvironment})');
-        return data['data'];
+        print('✅ Registration successful!');
+        return data;
       } else {
         print('❌ Registration failed: ${response.body}');
         return null;
@@ -109,33 +108,12 @@ class BackendApiService {
     }
   }
 
-  /// Test if backend server is running
-  static Future<bool> testConnection() async {
-    try {
-      print('🔍 Testing connection to: $baseUrl');
-      print('🔧 Current environment: ${EnvironmentSwitcher.currentEnvironment}');
-      
-      final healthUrl = baseUrl.replaceAll('/api', '/api/health');
-      final response = await http
-          .get(Uri.parse(healthUrl), headers: headers)
-          .timeout(const Duration(seconds: 10));
 
-      final success = response.statusCode == 200;
-      print(success ? '✅ Backend connection successful!' : '❌ Backend connection failed!');
-      return success;
-    } catch (e) {
-      print('🔍 Backend connection test failed: $e');
-      return false;
-    }
-  }
 
   /// Create a new report in the backend database
   static Future<Map<String, dynamic>?> createReport(Report report) async {
     try {
       print('🔍 Sending report to backend database...');
-
-      // Get authenticated headers with token
-      final authHeaders = await getAuthenticatedHeaders();
 
       // Prepare report data for API
       final reportData = {
@@ -156,7 +134,7 @@ class BackendApiService {
       final response = await http
           .post(
             Uri.parse('$baseUrl/reports/'),
-            headers: authHeaders,
+            headers: headers,
             body: json.encode(reportData),
           )
           .timeout(const Duration(seconds: 10));
@@ -181,23 +159,14 @@ class BackendApiService {
     try {
       print('🔍 Fetching reports from backend database...');
 
-      final authHeaders = await getAuthenticatedHeaders();
       final response = await http
-          .get(Uri.parse('$baseUrl/reports/'), headers: authHeaders)
+          .get(Uri.parse('$baseUrl/reports/'), headers: headers)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        
-        // Handle backend response format: {success: true, data: {reports: [...], pagination: {...}}}
-        if (responseData['success'] == true && responseData['data'] != null) {
-          final List<dynamic> reports = responseData['data']['reports'] ?? [];
-          print('✅ Fetched ${reports.length} reports from backend');
-          return reports.cast<Map<String, dynamic>>();
-        } else {
-          print('❌ Invalid response format from backend');
-          return [];
-        }
+        final List<dynamic> data = json.decode(response.body);
+        print('✅ Fetched ${data.length} reports from backend');
+        return data.cast<Map<String, dynamic>>();
       } else {
         print('❌ Failed to fetch reports: ${response.statusCode}');
         return [];
@@ -396,4 +365,99 @@ class BackendApiService {
       return false;
     }
   }
+
+  /// Create report with authentication
+  static Future<Map<String, dynamic>?> createReportAuthenticated({
+    required String token,
+    required Report report,
+  }) async {
+    try {
+      final authenticatedHeaders = {
+        ...headers,
+        'Authorization': 'Bearer $token',
+      };
+
+      final reportData = {
+        'title': report.title,
+        'description': report.description,
+        'category': report.category,
+        'location': report.location,
+        'address': report.address,
+        'latitude': report.latitude,
+        'longitude': report.longitude,
+        'priority': report.priority.toString().split('.').last.toLowerCase(),
+        'department': report.department,
+        'reporter_name': report.reporterName,
+        'reporter_email': report.reporterEmail,
+        'reporter_phone': report.reporterPhone,
+        'image_urls': report.imageUrls,
+        'video_urls': report.videoUrls,
+      };
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/reports/'),
+            headers: authenticatedHeaders,
+            body: json.encode(reportData),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 201) {
+        print('✅ Report created successfully in backend');
+        return json.decode(response.body);
+      } else {
+        print('❌ Failed to create report: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Error creating authenticated report: $e');
+      return null;
+    }
+  }
+
+  /// Create feedback with authentication
+  static Future<Map<String, dynamic>?> createFeedback({
+    required String token,
+    required String type,
+    required String message,
+    required String title,
+    required int rating,
+    String? reportId,
+  }) async {
+    try {
+      final authenticatedHeaders = {
+        ...headers,
+        'Authorization': 'Bearer $token',
+      };
+
+      final feedbackData = {
+        'type': type,
+        'message': message,
+        'title': title,
+        'rating': rating,
+        'report_id': reportId,
+      };
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/feedback/'),
+            headers: authenticatedHeaders,
+            body: json.encode(feedbackData),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 201) {
+        print('✅ Feedback created successfully in backend');
+        return json.decode(response.body);
+      } else {
+        print('❌ Failed to create feedback: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Error creating feedback: $e');
+      return null;
+    }
+  }
+
+
 }

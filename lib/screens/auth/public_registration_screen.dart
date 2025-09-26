@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../models/registration_request.dart';
 import '../../services/database_service.dart';
-import '../../core/config/environment_switcher.dart';
 
 class PublicRegistrationScreen extends StatefulWidget {
   const PublicRegistrationScreen({super.key});
@@ -21,7 +21,7 @@ class _PublicRegistrationScreenState extends State<PublicRegistrationScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   
-  String _selectedUserType = 'public';  // Backend expects 'public' not 'citizen'
+  String _selectedUserType = 'citizen';
   
   bool _isLoading = false;
 
@@ -121,7 +121,7 @@ class _PublicRegistrationScreenState extends State<PublicRegistrationScreen> {
                                 RadioListTile<String>(
                                   title: const Text('Citizen'),
                                   subtitle: const Text('Report issues and track their status'),
-                                  value: 'public',
+                                  value: 'citizen',
                                   groupValue: _selectedUserType,
                                   onChanged: (value) {
                                     setState(() {
@@ -375,18 +375,41 @@ class _PublicRegistrationScreenState extends State<PublicRegistrationScreen> {
     setState(() => _isLoading = true);
 
     try {
-      print('📝 Starting backend registration for: ${_emailController.text.trim()}');
-      print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
+      // Check if email already has a pending request
+      final hasExisting = await DatabaseService.instance.hasExistingRegistration(_emailController.text.trim());
+      if (hasExisting) {
+        _showErrorDialog('Registration Already Exists', 
+            'You already have a registration with this email address. You can login directly.');
+        return;
+      }
 
-      // Use BACKEND registration instead of local storage
-      final success = await DatabaseService.instance.registerUser(
-        name: _fullNameController.text.trim(),
+      // Check if user is already approved
+      final isApproved = await DatabaseService.instance.isUserApproved(_emailController.text.trim());
+      if (isApproved) {
+        _showErrorDialog('Account Already Exists', 
+            'This email address is already registered and approved. You can login directly.');
+        return;
+      }
+
+      // Create registration request
+      final request = RegistrationRequest(
+        id: 'reg_${DateTime.now().millisecondsSinceEpoch}',
+        fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
         phone: _phoneController.text.trim(),
-        location: _addressController.text.trim(),
-        userType: _selectedUserType,
+        address: _addressController.text.trim(),
+        idNumber: _idNumberController.text.trim(),
+        reason: _reasonController.text.trim(),
+        password: _passwordController.text.trim(),
+        requestDate: DateTime.now(),
+        status: RegistrationStatus.registered,
+        userType: _selectedUserType, // Always 'citizen' now
+        department: null, // No department for citizens
+        designation: null, // No designation for citizens
       );
+
+      // Submit the request
+      final success = await DatabaseService.instance.submitRegistrationRequest(request);
 
       if (success) {
         _showSuccessDialog();

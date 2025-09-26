@@ -33,52 +33,56 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       });
 
       try {
-        // Use Admin ID as email for backend authentication
-        final adminEmail = _adminIdController.text.trim();
+        final email = _adminIdController.text.trim();
         final password = _passwordController.text.trim();
+        final securityCode = _securityCodeController.text.trim();
         
-        // For admin authentication, we can use admin@civicwelfare.com
-        // or the entered admin ID if it contains @
-        final email = adminEmail.contains('@') ? adminEmail : 'admin@civicwelfare.com';
-        
-        // Backend authentication
+        print('🔐 [ADMIN LOGIN] Starting secure authentication process...');
+        print('🌐 [ENV] Current environment: ${EnvironmentSwitcher.currentEnvironment}');
+        print('🌐 [ENV] Backend URL: ${EnvironmentSwitcher.baseUrl}');
+        print('🔒 [SECURITY] Security code provided: ${securityCode.isNotEmpty}');
+
+        // Validate security code first
+        if (securityCode != 'ADMIN123') {
+          _showErrorDialog('Invalid Security Code', 'Please enter the correct admin security code.');
+          return;
+        }
+
+        // Authenticate admin with backend
         final authResult = await DatabaseService.instance.authenticateUser(email, password);
-        
-        if (authResult == null || authResult['success'] != true) {
-          _showErrorDialog(
-            'Admin Authentication Failed',
-            'Invalid administrator credentials. Please check your Admin ID, password, and security code.\n\nMake sure you are connected to the internet for authentication.',
-          );
+
+        if (authResult == null) {
+          print('❌ [LOGIN] Authentication failed for admin: $email');
+          _showErrorDialog('Login Failed', 'Invalid credentials. Please check your email and password.');
           return;
         }
 
         final user = authResult['user'];
-        
-        // Verify admin role
-        if (user['userType']?.toLowerCase() != 'admin') {
-          _showErrorDialog(
-            'Access Denied',
-            'This account does not have administrator privileges.',
-          );
+        print('✅ [LOGIN] Authentication successful for admin: ${user['name']}');
+        print('👤 [USER] Role: ${user['user_type']}, ID: ${user['id']}');
+
+        // Check if user is actually an admin
+        if (user['user_type'] != 'admin') {
+          print('❌ [ACCESS] User role mismatch - expected admin, got: ${user['user_type']}');
+          _showErrorDialog('Access Denied', 'This account does not have administrator privileges.');
           return;
         }
 
-        print('✅ Admin login successful - User: ${user['name']}');
-        print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
+        print('🔄 [SESSION] Admin session saved successfully');
+        print('🎉 [SUCCESS] Admin login complete - redirecting to control panel');
 
         // Navigate to admin dashboard
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const AdminDashboardScreen(),
-          ),
-        );
-        
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AdminDashboardScreen(),
+            ),
+          );
+        }
       } catch (e) {
-        _showErrorDialog(
-          'Login Error',
-          'An error occurred during admin login: $e',
-        );
+        print('❌ [ERROR] Admin login failed with error: $e');
+        _showErrorDialog('Login Error', 'An error occurred during login. Please check your network connection and try again.');
       } finally {
         if (mounted) {
           setState(() {
@@ -92,20 +96,16 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   void _showErrorDialog(String title, String message) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(title),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 

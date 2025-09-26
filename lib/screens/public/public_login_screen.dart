@@ -37,36 +37,59 @@ class _PublicLoginScreenState extends State<PublicLoginScreen> {
         final email = _emailController.text.trim();
         final password = _passwordController.text.trim();
         
-        // Use BACKEND authentication instead of local validation
+        print('🔐 [PUBLIC LOGIN] Starting login process...');
+        print('🌐 [ENV] Current environment: ${EnvironmentSwitcher.currentEnvironment}');
+        print('🌐 [ENV] Backend URL: ${EnvironmentSwitcher.baseUrl}');
+        
+        // Validate user login with email and password using the enhanced authentication
         final authResult = await DatabaseService.instance.authenticateUser(email, password);
         
-        if (authResult == null || authResult['success'] != true) {
-          _showStatusDialog(
-            'Login Failed',
-            'Invalid email or password. Please check your credentials and try again.\n\nMake sure you are connected to the internet for cloud authentication.',
-            'invalid_credentials',
-          );
+        if (authResult == null) {
+          print('❌ [LOGIN] Authentication failed for email: $email');
+          
+          // Check if user exists but password is wrong
+          final hasExistingRegistration = await DatabaseService.instance.hasExistingRegistration(email);
+          
+          if (hasExistingRegistration) {
+            _showStatusDialog(
+              'Login Failed',
+              'Invalid email or password. Please check your credentials and try again.',
+              'invalid_credentials',
+            );
+          } else {
+            _showStatusDialog(
+              'Account Not Found',
+              'No account found for this email address. Please register first.',
+              'not_found',
+            );
+          }
           return;
         }
 
-        // Extract user info from backend response
         final user = authResult['user'];
+        print('✅ [LOGIN] Authentication successful for user: ${user['name']}');
+        print('👤 [USER] Role: ${user['user_type']}, ID: ${user['id']}');
 
-        print('✅ Login successful - User: ${user['name']} (${user['userType']})');
-        print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
+        // User session is already saved by authenticateUser method
+        // No need to call saveUserSession again
 
-        // Session is already saved in authenticateUser method
+        print('🔄 [SESSION] User session saved successfully');
+        print('🎉 [SUCCESS] Login complete - redirecting to dashboard');
+
         // Navigate to dashboard
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const PublicDashboardScreen(),
-          ),
-        );
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PublicDashboardScreen(),
+            ),
+          );
+        }
       } catch (e) {
+        print('❌ [ERROR] Login failed with error: $e');
         _showStatusDialog(
           'Login Error',
-          'An error occurred during login: $e',
+          'An error occurred during login. Please check your network connection and try again.',
           'error',
         );
       } finally {
