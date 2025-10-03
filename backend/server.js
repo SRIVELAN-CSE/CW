@@ -22,6 +22,9 @@ const passwordResetRoutes = require('./routes/passwordReset');
 const needRequestRoutes = require('./routes/needRequests');
 const certificateRoutes = require('./routes/certificates');
 const feedbackRoutes = require('./routes/feedback');
+const dashboardRoutes = require('./routes/dashboard');
+const adminRoutes = require('./routes/admin');
+const searchRoutes = require('./routes/search');
 
 // Import middleware
 const { authenticate, authorize } = require('./middleware/auth');
@@ -127,7 +130,10 @@ app.get('/', (req, res) => {
       passwordReset: '/api/password-reset',
       needRequests: '/api/need-requests',
       certificates: '/api/certificates',
-      feedback: '/api/feedback'
+      feedback: '/api/feedback',
+      dashboard: '/api/dashboard',
+      admin: '/api/admin',
+      search: '/api/search'
     }
   });
 });
@@ -142,6 +148,9 @@ app.use('/api/password-reset', passwordResetRoutes);
 app.use('/api/need-requests', needRequestRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/search', searchRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

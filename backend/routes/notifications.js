@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 
 const Notification = require('../models/Notification');
-const { authenticate } = require('../middleware/auth');
+const User = require('../models/User');
+const { authenticate, authorize } = require('../middleware/auth');
 
 // @route   GET /api/notifications
 // @desc    Get user notifications with pagination
@@ -147,6 +149,132 @@ router.delete('/:id', authenticate, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete notification'
+    });
+  }
+});
+
+// @route   POST /api/notifications/bulk-create
+// @desc    Create bulk notifications (Admin only)
+// @access  Private (Admin)
+router.post('/bulk-create', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { title, message, type = 'announcement', targetUserTypes = ['public'], priority = 'medium' } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title and message are required'
+      });
+    }
+
+    // Get target users
+    const targetUsers = await User.find({
+      userType: { $in: targetUserTypes },
+      isActive: true
+    }).select('_id');
+
+    if (targetUsers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No target users found'
+      });
+    }
+
+    // Create notifications
+    const notifications = targetUsers.map(user => ({
+      title,
+      message,
+      type,
+      userId: user._id,
+      priority,
+      isSystemMessage: true
+    }));
+
+    const createdNotifications = await Notification.insertMany(notifications);
+
+    // Send real-time notifications
+    const io = req.app.get('io');
+    if (io) {
+      targetUsers.forEach(user => {
+        io.to(`user_${user._id}`).emit('newNotification', {
+          title,
+          message,
+          type,
+          priority
+        });
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Bulk notifications created successfully',
+      data: {
+        count: createdNotifications.length,
+        targetUserTypes
+      }
+    });
+
+  } catch (error) {
+    console.error('Bulk create notifications error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create bulk notifications'
+    });
+  }
+});
+
+// @route   GET /api/notifications/stats
+// @desc    Get notification statistics
+// @access  Private
+router.get('/stats', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const [
+      totalNotifications,
+      unreadCount,
+      typeDistribution,
+      recentCount,
+      priorityDistribution
+    ] = await Promise.all([
+      Notification.countDocuments({ userId }),
+      Notification.countDocuments({ userId, isRead: false }),
+      Notification.aggregate([
+        { $match: { userId: userId } },
+        { $group: { _id: '$type', count: { $sum: 1 } } }
+      ]),
+      Notification.countDocuments({
+        userId,
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
+      }),
+      Notification.aggregate([
+        { $match: { userId: userId } },
+        { $group: { _id: '$priority', count: { $sum: 1 } } }
+      ])
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        total: totalNotifications,
+        unread: unreadCount,
+        recent: recentCount,
+        typeBreakdown: typeDistribution.map(item => ({
+          type: item._id,
+          count: item.count
+        })),
+        priorityBreakdown: priorityDistribution.map(item => ({
+          priority: item._id,
+          count: item.count
+        }))
+      }
+    });
+
+  } catch (error) {
+    console.error('Notification stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notification statistics'
     });
   }
 });
