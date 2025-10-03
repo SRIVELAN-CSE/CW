@@ -28,11 +28,16 @@ const userSchemas = {
     phone: Joi.string().pattern(/^\+?[\d\s-()]{10,15}$/).required(),
     password: Joi.string().min(6).required(),
     userType: Joi.string().valid('public', 'officer').default('public'),
+    user_type: Joi.string().valid('public', 'officer').default('public'), // Frontend compatibility
     location: Joi.string().trim().allow(''),
     department: Joi.string().valid('garbageCollection', 'drainage', 'roadMaintenance', 'streetLights', 'waterSupply', 'others').when('userType', {
       is: 'officer',
       then: Joi.required(),
-      otherwise: Joi.optional()
+      otherwise: Joi.when('user_type', {
+        is: 'officer',
+        then: Joi.required(),
+        otherwise: Joi.optional()
+      })
     }),
     reason: Joi.string().trim().max(500).allow('')
   }),

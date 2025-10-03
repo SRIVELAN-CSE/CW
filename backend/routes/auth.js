@@ -20,7 +20,10 @@ const generateToken = (id) => {
 // @access  Public
 router.post('/register', validate(userSchemas.register), async (req, res) => {
   try {
-    const { name, email, phone, password, userType, location, department, reason } = req.body;
+    const { name, email, phone, password, userType, user_type, location, department, reason } = req.body;
+    
+    // Handle both userType and user_type from frontend
+    const finalUserType = userType || user_type || 'public';
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -45,7 +48,7 @@ router.post('/register', validate(userSchemas.register), async (req, res) => {
     }
 
     // For public users, create user directly
-    if (userType === 'public') {
+    if (finalUserType === 'public') {
       const user = await User.create({
         name,
         email,
@@ -81,10 +84,10 @@ router.post('/register', validate(userSchemas.register), async (req, res) => {
         name,
         email,
         phone,
-        userType,
+        userType: finalUserType,
         location,
         department,
-        reason: reason || `Request for ${userType} account registration`
+        reason: reason || `Request for ${finalUserType} account registration`
       });
 
       res.status(201).json({
