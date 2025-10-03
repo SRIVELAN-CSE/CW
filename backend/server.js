@@ -55,23 +55,39 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS configuration
+// CORS configuration - Flutter Web friendly
 app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || [
-    "http://localhost:3000", 
-    "http://127.0.0.1:3000",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080", 
-    "http://localhost:60548",
-    "http://127.0.0.1:60548",
-    "http://localhost:60257",
-    "http://127.0.0.1:60257",
-    "http://localhost:9101",
-    "http://127.0.0.1:9101"
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Allow all localhost and 127.0.0.1 origins for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
+    }
+    
+    // Allow production domains
+    const allowedOrigins = [
+      'https://civic-welfare-backend.onrender.com',
+      'https://civic-welfare-frontend.onrender.com'
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'Access-Control-Allow-Origin',
+    'Access-Control-Allow-Headers',
+    'Access-Control-Allow-Methods',
+    'Access-Control-Allow-Credentials'
+  ]
 }));
 
 // Body parsing middleware

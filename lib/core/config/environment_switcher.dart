@@ -2,7 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class EnvironmentSwitcher {
   // Development server configuration (Local)
-  static const String _devBaseUrl = 'http://10.0.2.2:3000/api'; // Android emulator localhost
+  static const String _devBaseUrl = 'http://localhost:3000/api'; // Chrome/Web localhost
   static const String _devServerName = 'Local Development Server';
 
   // Production server configuration (Render.com)
