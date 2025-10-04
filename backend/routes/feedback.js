@@ -68,6 +68,53 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// @route   POST /api/feedback/public
+// @desc    Submit new feedback (Public - no auth required)
+// @access  Public
+router.post('/public', async (req, res) => {
+  try {
+    console.log('💬 Creating public feedback:', req.body);
+    
+    const feedbackData = {
+      type: req.body.type || 'general_suggestion',
+      title: req.body.title,
+      message: req.body.message,
+      rating: req.body.rating,
+      category: req.body.category || 'General',
+      userName: req.body.userName || 'Anonymous',
+      userEmail: req.body.userEmail || 'anonymous@example.com',
+      isAnonymous: req.body.isAnonymous || false
+    };
+
+    console.log('🔍 Processed feedback data:', feedbackData);
+    
+    const feedback = await Feedback.create(feedbackData);
+    console.log('✅ Feedback created with ID:', feedback._id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Feedback submitted successfully',
+      data: { 
+        feedback: {
+          _id: feedback._id,
+          type: feedback.type,
+          title: feedback.title,
+          rating: feedback.rating,
+          category: feedback.category,
+          createdAt: feedback.createdAt
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Create public feedback error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit feedback',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
 // @route   POST /api/feedback
 // @desc    Submit new feedback
 // @access  Private

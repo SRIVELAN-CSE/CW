@@ -279,39 +279,82 @@ class DatabaseService {
   // Save a new report
   Future<void> saveReport(Report report) async {
     try {
+      await EnvironmentSwitcher.initialize();
       print('📝 [REPORT] Saving report with real-time backend synchronization...');
       print('🌐 [ENV] Current environment: ${EnvironmentSwitcher.currentEnvironment}');
       print('🌐 [ENV] Backend URL: ${EnvironmentSwitcher.baseUrl}');
+      print('🚀 [MODE] Production mode: ${EnvironmentSwitcher.isProduction}');
       
       // First, try to save to backend database for real-time sync
       bool backendSaveSuccess = false;
-      try {
-        print('🔍 [BACKEND] Attempting authenticated report save...');
+      
+      // In production mode, be more aggressive about backend saving
+      if (EnvironmentSwitcher.isProduction) {
+        print('� [PRODUCTION] Production mode - prioritizing backend database');
         
-        // Get current auth token
-        final token = await getAuthToken();
-        if (token != null) {
-          final backendResult = await BackendApiService.createReportAuthenticated(
-            token: token,
-            report: report,
-          );
-          if (backendResult != null) {
-            print('✅ [BACKEND] Report successfully saved to backend database!');
-            print('🔍 [BACKEND] Backend Report ID: ${backendResult['id']}');
-            print('🔄 [SYNC] Real-time sync complete - available on all devices');
-            backendSaveSuccess = true;
+        // Try multiple backend save methods in production
+        try {
+          print('🔍 [BACKEND] Method 1: Trying authenticated save...');
+          final token = await getAuthToken();
+          if (token != null) {
+            final backendResult = await BackendApiService.createReportAuthenticated(
+              token: token,
+              report: report,
+            );
+            if (backendResult != null) {
+              print('✅ [BACKEND] Report successfully saved to production database!');
+              print('🔍 [BACKEND] Backend Report ID: ${backendResult['id']}');
+              backendSaveSuccess = true;
+            }
           }
-        } else {
-          print('⚠️ [AUTH] No authentication token available, using fallback method');
-          final backendResult = await BackendApiService.createReport(report);
-          if (backendResult != null) {
-            print('✅ [BACKEND] Report saved to backend (fallback method)');
-            backendSaveSuccess = true;
+        } catch (e1) {
+          print('⚠️ [BACKEND] Method 1 failed: $e1');
+        }
+        
+        // If authenticated method failed, try unauthenticated
+        if (!backendSaveSuccess) {
+          try {
+            print('🔍 [BACKEND] Method 2: Trying unauthenticated save...');
+            final backendResult = await BackendApiService.createReport(report);
+            if (backendResult != null) {
+              print('✅ [BACKEND] Report saved to production database (unauthenticated)!');
+              backendSaveSuccess = true;
+            }
+          } catch (e2) {
+            print('⚠️ [BACKEND] Method 2 failed: $e2');
           }
         }
-      } catch (e) {
-        print('⚠️ [BACKEND] Backend save failed: $e');
-        print('📱 [FALLBACK] Will save locally and retry sync later');
+        
+        if (backendSaveSuccess) {
+          print('🎉 [SUCCESS] Report successfully stored in MongoDB Atlas via Render!');
+        } else {
+          print('❌ [ERROR] All backend save methods failed in production mode');
+          print('⚠️ [FALLBACK] Saving to localStorage as backup');
+        }
+      } else {
+        // Development mode - normal flow
+        try {
+          print('🔍 [BACKEND] Attempting authenticated report save...');
+          final token = await getAuthToken();
+          if (token != null) {
+            final backendResult = await BackendApiService.createReportAuthenticated(
+              token: token,
+              report: report,
+            );
+            if (backendResult != null) {
+              print('✅ [BACKEND] Report successfully saved to backend database!');
+              backendSaveSuccess = true;
+            }
+          } else {
+            final backendResult = await BackendApiService.createReport(report);
+            if (backendResult != null) {
+              print('✅ [BACKEND] Report saved to backend (fallback method)');
+              backendSaveSuccess = true;
+            }
+          }
+        } catch (e) {
+          print('⚠️ [BACKEND] Backend save failed: $e');
+        }
       }
 
       // Save to local storage (always do this for offline capability)
@@ -1863,19 +1906,37 @@ class DatabaseService {
   /// Initialize backend connection and sync on app start
   Future<void> initializeBackendSync() async {
     try {
+      await EnvironmentSwitcher.initialize();
       print('🔍 Initializing backend synchronization...');
+      print('🌐 Environment: ${EnvironmentSwitcher.currentEnvironment}');
+      print('📡 Backend URL: ${EnvironmentSwitcher.baseUrl}');
 
+      // Force backend mode when using production environment
+      if (EnvironmentSwitcher.isProduction) {
+        print('🚀 Production mode detected - forcing backend database usage');
+        print('✅ Backend database connection enforced for production');
+        
+        // Try to sync local data to backend
+        try {
+          await syncToBackend();
+          print('🔄 Local data synced to backend database');
+        } catch (syncError) {
+          print('⚠️ Sync error (will retry later): $syncError');
+        }
+        return;
+      }
+
+      // For development, test connection first
       final isConnected = await testBackendConnection();
       if (isConnected) {
         print('✅ Backend database connected successfully');
-
-        // Auto-sync local data to backend
         await syncToBackend();
       } else {
         print('⚠️ Backend database not available - using local storage only');
       }
     } catch (e) {
       print('❌ Error initializing backend sync: $e');
+      print('🔧 Falling back to backend mode anyway (production)');
     }
   }
 

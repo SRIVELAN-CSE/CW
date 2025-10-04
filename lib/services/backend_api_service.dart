@@ -134,41 +134,41 @@ class BackendApiService {
 
 
 
-  /// Create a new report in the backend database (anonymous submission)
+  /// Create a new report in the backend database
   static Future<Map<String, dynamic>?> createReport(Report report) async {
     try {
       await EnvironmentSwitcher.initialize();
       print('🔍 Sending report to backend database...');
       print('🌐 Using server: $baseUrl');
-      print('📊 Report details: ${report.title} - ${report.category}');
 
-      // Prepare report data for anonymous API
+      // Prepare report data for API
       final reportData = {
         'title': report.title,
         'description': report.description,
         'category': report.category,
         'location': report.location,
         'address': report.address,
-        'priority': report.priority,
-        'reporterName': report.reporterName,
-        'reporterEmail': report.reporterEmail,
-        'reporterPhone': report.reporterPhone,
+        'latitude': report.latitude,
+        'longitude': report.longitude,
+        'priority': report.priority.toString().split('.').last,
+        'reporter_name': report.reporterName,
+        'reporter_email': report.reporterEmail,
+        'reporter_phone': report.reporterPhone,
         'imageUrls': report.imageUrls,
-        'tags': [report.category.toLowerCase()],
       };
 
-      print('📤 Submitting report data: ${json.encode(reportData)}');
+      print('📤 Sending report data: ${json.encode(reportData)}');
 
       final response = await http
           .post(
-            Uri.parse('$baseUrl/reports/anonymous'),
+            Uri.parse('$baseUrl/reports/public'),
             headers: headers,
             body: json.encode(reportData),
           )
           .timeout(const Duration(seconds: 15));
 
-      print('🔍 Report submission response: ${response.statusCode}');
-      print('🔍 Response body: ${response.body}');
+      print('🔍 Report creation response status: ${response.statusCode}');
+      print('🔍 Report creation response body: ${response.body}');
 
       if (response.statusCode == 201) {
         print('✅ Report saved to backend database!');
@@ -178,73 +178,15 @@ class BackendApiService {
         print('❌ Failed to save report: ${response.statusCode}');
         print('❌ Response: ${response.body}');
         try {
-          final errorData = jsonDecode(response.body);
-          return {'error': errorData['message'] ?? 'Failed to submit report'};
+          final errorData = json.decode(response.body);
+          return {'error': errorData['message'] ?? 'Failed to save report'};
         } catch (e) {
-          return {'error': 'Failed to submit report with status ${response.statusCode}'};
+          return {'error': 'Failed to save report with status ${response.statusCode}'};
         }
       }
     } catch (e) {
       print('❌ Error saving report to backend: $e');
-      return {'error': 'Network error during report submission: $e'};
-    }
-  }
-
-  /// Submit certificate application (anonymous)
-  static Future<Map<String, dynamic>?> submitCertificateApplication({
-    required String certificateType,
-    required String applicantName,
-    required String applicantEmail,
-    required String applicantPhone,
-    required Map<String, dynamic> applicationDetails,
-    String priority = 'Normal',
-  }) async {
-    try {
-      await EnvironmentSwitcher.initialize();
-      print('📜 Submitting certificate application...');
-      print('🌐 Using server: $baseUrl');
-      print('📋 Certificate type: $certificateType');
-
-      final applicationData = {
-        'certificateType': certificateType,
-        'applicantName': applicantName,
-        'applicantEmail': applicantEmail,
-        'applicantPhone': applicantPhone,
-        'applicationDetails': applicationDetails,
-        'priority': priority,
-        'supportingDocuments': [],
-      };
-
-      print('📤 Submitting certificate data: ${json.encode(applicationData)}');
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/certificates/anonymous'),
-            headers: headers,
-            body: json.encode(applicationData),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      print('🔍 Certificate submission response: ${response.statusCode}');
-      print('🔍 Response body: ${response.body}');
-
-      if (response.statusCode == 201) {
-        print('✅ Certificate application submitted!');
-        final result = json.decode(response.body);
-        return result;
-      } else {
-        print('❌ Failed to submit certificate application: ${response.statusCode}');
-        print('❌ Response: ${response.body}');
-        try {
-          final errorData = jsonDecode(response.body);
-          return {'error': errorData['message'] ?? 'Failed to submit certificate application'};
-        } catch (e) {
-          return {'error': 'Failed to submit certificate application with status ${response.statusCode}'};
-        }
-      }
-    } catch (e) {
-      print('❌ Error submitting certificate application: $e');
-      return {'error': 'Network error during certificate application submission: $e'};
+      return {'error': 'Network error while saving report: $e'};
     }
   }
 
@@ -553,5 +495,182 @@ class BackendApiService {
     }
   }
 
+  /// ========== PUBLIC METHODS (NO AUTH REQUIRED) ==========
+  
+  /// Create certificate application (Public)
+  static Future<Map<String, dynamic>?> createCertificatePublic({
+    required String certificateType,
+    required String applicantName,
+    required String applicantEmail,
+    required String applicantPhone,
+    required Map<String, dynamic> applicationDetails,
+    String priority = 'Normal',
+  }) async {
+    try {
+      await EnvironmentSwitcher.initialize();
+      print('📜 Creating public certificate application...');
+      print('🌐 Using server: $baseUrl');
+
+      final certificateData = {
+        'certificateType': certificateType,
+        'applicantName': applicantName,
+        'applicantEmail': applicantEmail,
+        'applicantPhone': applicantPhone,
+        'applicationDetails': applicationDetails,
+        'priority': priority,
+      };
+
+      print('📤 Sending certificate data: ${json.encode(certificateData)}');
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/certificates/public'),
+            headers: headers,
+            body: json.encode(certificateData),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      print('🔍 Certificate creation response status: ${response.statusCode}');
+      print('🔍 Certificate creation response body: ${response.body}');
+
+      if (response.statusCode == 201) {
+        print('✅ Certificate application submitted to backend database!');
+        return json.decode(response.body);
+      } else {
+        print('❌ Failed to submit certificate application: ${response.statusCode}');
+        try {
+          final errorData = json.decode(response.body);
+          return {'error': errorData['message'] ?? 'Failed to submit certificate application'};
+        } catch (e) {
+          return {'error': 'Failed to submit certificate application'};
+        }
+      }
+    } catch (e) {
+      print('❌ Error submitting certificate application: $e');
+      return {'error': 'Network error while submitting certificate application: $e'};
+    }
+  }
+
+  /// Create need request (Public)
+  static Future<Map<String, dynamic>?> createNeedRequestPublic({
+    required String title,
+    required String description,
+    required String category,
+    required String location,
+    required String requesterName,
+    required String requesterEmail,
+    required String requesterPhone,
+    String urgencyLevel = 'Medium',
+    int beneficiaryCount = 1,
+    double estimatedCost = 0,
+    String? address,
+  }) async {
+    try {
+      await EnvironmentSwitcher.initialize();
+      print('🤲 Creating public need request...');
+      print('🌐 Using server: $baseUrl');
+
+      final requestData = {
+        'title': title,
+        'description': description,
+        'category': category,
+        'location': location,
+        'address': address,
+        'urgencyLevel': urgencyLevel,
+        'beneficiaryCount': beneficiaryCount,
+        'estimatedCost': estimatedCost,
+        'requesterName': requesterName,
+        'requesterEmail': requesterEmail,
+        'requesterPhone': requesterPhone,
+      };
+
+      print('📤 Sending need request data: ${json.encode(requestData)}');
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/need-requests/public'),
+            headers: headers,
+            body: json.encode(requestData),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      print('🔍 Need request creation response status: ${response.statusCode}');
+      print('🔍 Need request creation response body: ${response.body}');
+
+      if (response.statusCode == 201) {
+        print('✅ Need request submitted to backend database!');
+        return json.decode(response.body);
+      } else {
+        print('❌ Failed to submit need request: ${response.statusCode}');
+        try {
+          final errorData = json.decode(response.body);
+          return {'error': errorData['message'] ?? 'Failed to submit need request'};
+        } catch (e) {
+          return {'error': 'Failed to submit need request'};
+        }
+      }
+    } catch (e) {
+      print('❌ Error submitting need request: $e');
+      return {'error': 'Network error while submitting need request: $e'};
+    }
+  }
+
+  /// Create feedback (Public)
+  static Future<Map<String, dynamic>?> createFeedbackPublic({
+    required String type,
+    required String message,
+    required String userName,
+    required String userEmail,
+    String? title,
+    int? rating,
+    String category = 'General',
+    bool isAnonymous = false,
+  }) async {
+    try {
+      await EnvironmentSwitcher.initialize();
+      print('💬 Creating public feedback...');
+      print('🌐 Using server: $baseUrl');
+
+      final feedbackData = {
+        'type': type,
+        'title': title,
+        'message': message,
+        'rating': rating,
+        'category': category,
+        'userName': userName,
+        'userEmail': userEmail,
+        'isAnonymous': isAnonymous,
+      };
+
+      print('📤 Sending feedback data: ${json.encode(feedbackData)}');
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/feedback/public'),
+            headers: headers,
+            body: json.encode(feedbackData),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      print('🔍 Feedback creation response status: ${response.statusCode}');
+      print('🔍 Feedback creation response body: ${response.body}');
+
+      if (response.statusCode == 201) {
+        print('✅ Feedback submitted to backend database!');
+        return json.decode(response.body);
+      } else {
+        print('❌ Failed to submit feedback: ${response.statusCode}');
+        try {
+          final errorData = json.decode(response.body);
+          return {'error': errorData['message'] ?? 'Failed to submit feedback'};
+        } catch (e) {
+          return {'error': 'Failed to submit feedback'};
+        }
+      }
+    } catch (e) {
+      print('❌ Error submitting feedback: $e');
+      return {'error': 'Network error while submitting feedback: $e'};
+    }
+  }
 
 }

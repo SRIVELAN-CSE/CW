@@ -414,57 +414,41 @@ router.get('/analytics/summary', authenticate, authorize('admin', 'officer'), as
   }
 });
 
-// @route   POST /api/reports/anonymous
-// @desc    Create a new report (anonymous/guest users)
+// @route   POST /api/reports/public
+// @desc    Create a new report (Public - no auth required)
 // @access  Public
-router.post('/anonymous', validate(reportSchemas.create), async (req, res) => {
+router.post('/public', async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      category,
-      location,
-      address,
-      priority = 'Medium',
-      reporterName,
-      reporterEmail,
-      reporterPhone,
-      imageUrls = [],
-      tags = []
-    } = req.body;
-
-    console.log('📊 Anonymous report submission:', {
-      title,
-      category,
-      location,
-      reporterEmail: reporterEmail ? '***' + reporterEmail.slice(-10) : 'not provided'
-    });
-
+    console.log('📝 Creating public report:', req.body);
+    
     const reportData = {
-      title,
-      description,
-      category,
-      location,
-      address,
-      priority,
-      reporterName: reporterName || 'Anonymous',
-      reporterEmail: reporterEmail || 'anonymous@example.com',
-      reporterPhone: reporterPhone || 'Not provided',
-      imageUrls,
-      tags,
+      title: req.body.title,
+      description: req.body.description,
+      category: req.body.category,
+      location: req.body.location,
+      address: req.body.address,
+      latitude: req.body.latitude,
+      longitude: req.body.longitude,
+      priority: req.body.priority || 'Medium',
+      reporterName: req.body.reporter_name || req.body.reporterName || 'Anonymous',
+      reporterEmail: req.body.reporter_email || req.body.reporterEmail || 'anonymous@example.com',
+      reporterPhone: req.body.reporter_phone || req.body.reporterPhone || 'Not provided',
+      imageUrls: req.body.imageUrls || [],
+      tags: req.body.tags || [],
       status: 'submitted'
     };
 
+    console.log('🔍 Processed report data:', reportData);
+    
     const report = await Report.create(reportData);
-
-    console.log('✅ Anonymous report created:', report._id);
+    console.log('✅ Report created with ID:', report._id);
 
     // Create notification for admins about new report
     const adminUsers = await require('../models/User').find({ userType: 'admin' });
     
     for (const admin of adminUsers) {
       await Notification.create({
-        title: 'New Anonymous Report Submitted',
+        title: 'New Report Submitted',
         message: `A new ${report.category} report has been submitted by ${report.reporterName}`,
         type: 'report_update',
         userId: admin._id,
@@ -477,27 +461,29 @@ router.post('/anonymous', validate(reportSchemas.create), async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Report submitted successfully',
-      data: {
-        reportId: report._id,
-        title: report.title,
-        category: report.category,
-        status: report.status,
-        trackingNumber: report._id.toString().slice(-8).toUpperCase()
+      data: { 
+        report: {
+          _id: report._id,
+          title: report.title,
+          category: report.category,
+          status: report.status,
+          priority: report.priority,
+          createdAt: report.createdAt
+        }
       }
     });
-
   } catch (error) {
-    console.error('❌ Anonymous report creation error:', error);
+    console.error('❌ Create public report error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to submit report. Please try again.',
+      message: 'Failed to create report',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
 
 // @route   POST /api/reports
-// @desc    Create a new report (authenticated users)
+// @desc    Create a new report
 // @access  Private
 router.post('/', authenticate, validate(reportSchemas.create), async (req, res) => {
   try {

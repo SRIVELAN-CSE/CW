@@ -66,6 +66,72 @@ router.get('/', async (req, res) => {
   }
 });
 
+// @route   POST /api/need-requests/public
+// @desc    Create new need request (Public - no auth required)
+// @access  Public
+router.post('/public', async (req, res) => {
+  try {
+    console.log('🤲 Creating public need request:', req.body);
+    
+    const requestData = {
+      title: req.body.title,
+      description: req.body.description,
+      category: req.body.category,
+      location: req.body.location,
+      address: req.body.address,
+      urgencyLevel: req.body.urgencyLevel || 'Medium',
+      beneficiaryCount: req.body.beneficiaryCount || 1,
+      estimatedCost: req.body.estimatedCost || 0,
+      requesterName: req.body.requesterName || 'Anonymous',
+      requesterEmail: req.body.requesterEmail || 'anonymous@example.com',
+      requesterPhone: req.body.requesterPhone || 'Not provided',
+      status: 'submitted'
+    };
+
+    console.log('🔍 Processed need request data:', requestData);
+    
+    const needRequest = await NeedRequest.create(requestData);
+    console.log('✅ Need request created with ID:', needRequest._id);
+
+    // Notify admins
+    const adminUsers = await require('../models/User').find({ userType: 'admin' });
+    
+    for (const admin of adminUsers) {
+      await Notification.create({
+        title: 'New Need Request',
+        message: `New ${needRequest.category} request from ${needRequest.requesterName}`,
+        type: 'system_alert',
+        userId: admin._id,
+        relatedId: needRequest._id,
+        relatedModel: 'NeedRequest',
+        priority: needRequest.urgencyLevel === 'Critical' ? 'high' : 'medium'
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Need request submitted successfully',
+      data: { 
+        needRequest: {
+          _id: needRequest._id,
+          title: needRequest.title,
+          category: needRequest.category,
+          status: needRequest.status,
+          urgencyLevel: needRequest.urgencyLevel,
+          createdAt: needRequest.createdAt
+        }
+      }
+    });
+  } catch (error) {
+    console.error('❌ Create public need request error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create need request',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
 // @route   POST /api/need-requests
 // @desc    Create new need request
 // @access  Private
