@@ -67,8 +67,86 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// @route   POST /api/certificates/anonymous
+// @desc    Apply for a new certificate (anonymous users)
+// @access  Public
+router.post('/anonymous', validate(certificateSchemas.create), async (req, res) => {
+  try {
+    const {
+      certificateType,
+      applicantName,
+      applicantEmail,
+      applicantPhone,
+      applicationDetails,
+      priority = 'Normal',
+      supportingDocuments = []
+    } = req.body;
+
+    console.log('📜 Anonymous certificate application:', {
+      certificateType,
+      applicantName,
+      applicantEmail: applicantEmail ? '***' + applicantEmail.slice(-10) : 'not provided'
+    });
+
+    // Generate application number
+    const applicationNumber = certificateType.substring(0, 2).toUpperCase() + Date.now();
+
+    const certificateData = {
+      certificateType,
+      applicantName: applicantName || 'Anonymous',
+      applicantEmail: applicantEmail || 'anonymous@example.com',
+      applicantPhone: applicantPhone || 'Not provided',
+      applicationDetails,
+      applicationNumber,
+      priority,
+      supportingDocuments,
+      status: 'submitted',
+      // Calculate expected delivery (7 days for Normal, 3 days for Urgent)
+      expectedDeliveryDate: new Date(Date.now() + (priority === 'Urgent' ? 3 : 7) * 24 * 60 * 60 * 1000)
+    };
+
+    const certificate = await Certificate.create(certificateData);
+    console.log('✅ Anonymous certificate application created:', certificate._id);
+
+    // Create notification for admins
+    const adminUsers = await User.find({ userType: 'admin' });
+    
+    for (const admin of adminUsers) {
+      await Notification.create({
+        title: 'New Certificate Application',
+        message: `New ${certificateType} application from ${applicantName}`,
+        type: 'system_alert',
+        userId: admin._id,
+        relatedId: certificate._id,
+        relatedModel: 'Certificate',
+        priority: priority === 'Urgent' ? 'high' : 'medium'
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Certificate application submitted successfully',
+      data: {
+        applicationId: certificate._id,
+        applicationNumber: certificate.applicationNumber,
+        certificateType: certificate.certificateType,
+        status: certificate.status,
+        expectedDelivery: certificate.expectedDeliveryDate
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Anonymous certificate application error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit certificate application. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
 // @route   POST /api/certificates
-// @desc    Apply for a new certificate
+// @desc    Apply for a new certificate (authenticated users)
 // @access  Private
 router.post('/', authenticate, validate(certificateSchemas.create), async (req, res) => {
   try {
