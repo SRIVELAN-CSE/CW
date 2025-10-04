@@ -8,6 +8,25 @@ const Notification = require('../models/Notification');
 const { authenticate, authorize } = require('../middleware/auth');
 const { validate, reportSchemas } = require('../middleware/validation');
 
+// @route   GET /api/reports/simple
+// @desc    Get reports in simple array format (Flutter compatible)
+// @access  Public
+router.get('/simple', async (req, res) => {
+  try {
+    const reports = await Report.find()
+      .populate('reporterId', 'name email')
+      .populate('assignedOfficerId', 'name email department')
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    // Return direct array for Flutter compatibility
+    res.json(reports);
+  } catch (error) {
+    console.error('Get simple reports error:', error);
+    res.status(500).json([]);
+  }
+});
+
 // @route   GET /api/reports
 // @desc    Get all reports with filtering and pagination
 // @access  Public

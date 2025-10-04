@@ -25,6 +25,7 @@ const feedbackRoutes = require('./routes/feedback');
 const dashboardRoutes = require('./routes/dashboard');
 const adminRoutes = require('./routes/admin');
 const searchRoutes = require('./routes/search');
+const flutterFixesRoutes = require('./routes/flutter-fixes');
 
 // Import middleware
 const { authenticate, authorize } = require('./middleware/auth');
@@ -167,6 +168,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/flutter', flutterFixesRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

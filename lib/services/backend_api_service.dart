@@ -79,37 +79,56 @@ class BackendApiService {
     String? department,
   }) async {
     try {
+      await EnvironmentSwitcher.initialize();
       print('📝 Registering user: $email');
+      print('👤 User type: $userType');
+      print('🏢 Department: ${department ?? 'others'}');
+      print('🌐 Using server: $baseUrl');
+
+      final requestBody = {
+        'name': name,
+        'email': email,
+        'password': password,
+        'phone': phone,
+        'location': location,
+        'userType': userType.toLowerCase(),
+        'user_type': userType.toLowerCase(),
+        'department': department ?? 'others',
+      };
+
+      print('📤 Request body: ${jsonEncode(requestBody)}');
 
       final response = await http
           .post(
             Uri.parse('$baseUrl/auth/register'),
             headers: headers,
-            body: jsonEncode({
-              'name': name,
-              'email': email,
-              'password': password,
-              'phone': phone,
-              'location': location,
-              'user_type': userType.toLowerCase(),
-              'department': department ?? 'others',
-            }),
+            body: jsonEncode(requestBody),
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 15));
 
       print('🔍 Registration response status: ${response.statusCode}');
+      print('🔍 Registration response body: ${response.body}');
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
         print('✅ Registration successful!');
+        if (userType.toLowerCase() == 'officer') {
+          print('👮‍♂️ Officer registration request submitted for approval');
+        }
         return data;
       } else {
-        print('❌ Registration failed: ${response.body}');
-        return null;
+        print('❌ Registration failed with status ${response.statusCode}');
+        print('❌ Response body: ${response.body}');
+        try {
+          final errorData = jsonDecode(response.body);
+          return {'error': errorData['message'] ?? 'Registration failed'};
+        } catch (e) {
+          return {'error': 'Registration failed with status ${response.statusCode}'};
+        }
       }
     } catch (e) {
       print('🚨 Registration error: $e');
-      return null;
+      return {'error': 'Network error during registration: $e'};
     }
   }
 
@@ -165,7 +184,7 @@ class BackendApiService {
       print('🔍 Fetching reports from backend database...');
 
       final response = await http
-          .get(Uri.parse('$baseUrl/reports/'), headers: headers)
+          .get(Uri.parse('$baseUrl/reports/simple'), headers: headers)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
