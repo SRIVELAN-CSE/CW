@@ -32,8 +32,8 @@ router.get('/', async (req, res) => {
     if (category) filter.category = category;
     if (priority) filter.priority = priority;
     if (department) filter.department = department;
-    if (reporterId) filter.reporterId = reporterId;
-    if (assignedOfficerId) filter.assignedOfficerId = assignedOfficerId;
+    if (reporterId) filter.submittedBy = reporterId;
+    if (assignedOfficerId) filter.assignedOfficer = assignedOfficerId;
     
     // Add text search
     if (search) {
@@ -47,8 +47,8 @@ router.get('/', async (req, res) => {
 
     // Execute query
     const reports = await Report.find(filter)
-      .populate('reporterId', 'name email')
-      .populate('assignedOfficerId', 'name email department')
+      .populate('submittedBy', 'name email')
+      .populate('assignedOfficer', 'name email department')
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
