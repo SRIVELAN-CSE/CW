@@ -45,9 +45,9 @@ class ServerConfig {
     ),
     'cloud': ServerConfigModel(
       name: 'Cloud Production Server',
-      baseURL: 'https://civic-welfare-sih.onrender.com', // Update with your actual Render URL
-      apiURL: 'https://civic-welfare-sih.onrender.com/api',
-      websocketURL: 'wss://civic-welfare-sih.onrender.com',
+      baseURL: 'https://civic-welfare-backend.onrender.com',
+      apiURL: 'https://civic-welfare-backend.onrender.com/api',
+      websocketURL: 'wss://civic-welfare-backend.onrender.com',
       description: 'Production server on Render cloud',
       icon: '☁️',
       color: '#4CAF50',

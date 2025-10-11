@@ -3,7 +3,7 @@ import '../config/server_config.dart';
 
 class EnvironmentService {
   static const String _environmentKey = 'current_server_environment';
-  static const String _defaultEnvironment = 'local';
+  static const String _defaultEnvironment = 'cloud'; // Default to cloud server since it's deployed
   
   static EnvironmentService? _instance;
   static EnvironmentService get instance => _instance ??= EnvironmentService._();
@@ -18,11 +18,8 @@ class EnvironmentService {
     _prefs = await SharedPreferences.getInstance();
     _currentEnvironment = _prefs?.getString(_environmentKey) ?? _defaultEnvironment;
     
-    // Force switch to local if cloud server fails
-    if (_currentEnvironment == 'cloud') {
-      print('🔄 Switching from cloud to local server (cloud server not available)');
-      await switchEnvironment('local');
-    }
+    print('🌐 Environment Service initialized: $_currentEnvironment');
+    print('� Current API URL: ${currentConfig.apiURL}');
   }
   
   // Get current environment
