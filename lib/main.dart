@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'screens/auth/user_type_selection_screen.dart';
 import 'services/database_service.dart';
 import 'screens/public/public_dashboard_screen.dart';
 import 'screens/officer/officer_dashboard_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'core/utils/storage_debugger.dart';
-import 'core/config/environment_switcher.dart';
+import 'providers/environment_provider.dart';
+import 'services/environment_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   print('🚀 Starting CivicWelfare App...');
+  print('📱 Running with server switching capability');
   
-  // Initialize environment switcher first
-  await EnvironmentSwitcher.initialize();
-  
-  print('🌐 Environment: ${EnvironmentSwitcher.currentEnvironment}');
-  print('📡 API Base URL: ${EnvironmentSwitcher.baseUrl}');
-  print('📱 Multi-device sync ready');
+  // Initialize environment service
+  await EnvironmentService.instance.initialize();
   
   runApp(const MyApp());
 }
@@ -28,9 +27,11 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CivicWelfare',
-      theme: ThemeData(
+    return ChangeNotifierProvider(
+      create: (context) => EnvironmentProvider(),
+      child: MaterialApp(
+        title: 'CivicWelfare',
+        theme: ThemeData(
         // This is the theme of your application.
         //
         // TRY THIS: Try running your application with "flutter run". You'll see
@@ -49,6 +50,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
       ),
       home: const SplashScreen(),
+      ),
     );
   }
 }

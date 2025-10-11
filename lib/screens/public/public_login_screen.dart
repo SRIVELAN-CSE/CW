@@ -4,7 +4,6 @@ import '../auth/public_registration_screen.dart';
 import '../auth/forgot_password_screen.dart';
 import '../auth/check_reset_status_screen.dart';
 import '../../services/database_service.dart';
-import '../../core/config/environment_switcher.dart';
 
 class PublicLoginScreen extends StatefulWidget {
   const PublicLoginScreen({super.key});
@@ -37,16 +36,10 @@ class _PublicLoginScreenState extends State<PublicLoginScreen> {
         final email = _emailController.text.trim();
         final password = _passwordController.text.trim();
         
-        print('🔐 [PUBLIC LOGIN] Starting login process...');
-        print('🌐 [ENV] Current environment: ${EnvironmentSwitcher.currentEnvironment}');
-        print('🌐 [ENV] Backend URL: ${EnvironmentSwitcher.baseUrl}');
+        // Validate user login with email and password
+        final user = await DatabaseService.instance.validateUserLogin(email, password);
         
-        // Validate user login with email and password using the enhanced authentication
-        final authResult = await DatabaseService.instance.authenticateUser(email, password);
-        
-        if (authResult == null) {
-          print('❌ [LOGIN] Authentication failed for email: $email');
-          
+        if (user == null) {
           // Check if user exists but password is wrong
           final hasExistingRegistration = await DatabaseService.instance.hasExistingRegistration(email);
           
@@ -66,30 +59,25 @@ class _PublicLoginScreenState extends State<PublicLoginScreen> {
           return;
         }
 
-        final user = authResult['user'];
-        print('✅ [LOGIN] Authentication successful for user: ${user['name']}');
-        print('👤 [USER] Role: ${user['user_type']}, ID: ${user['id']}');
-
-        // User session is already saved by authenticateUser method
-        // No need to call saveUserSession again
-
-        print('🔄 [SESSION] User session saved successfully');
-        print('🎉 [SUCCESS] Login complete - redirecting to dashboard');
+        // Save user session
+        await DatabaseService.instance.saveUserSession(
+          userId: user.id,
+          userName: user.fullName,
+          userEmail: user.email,
+          userRole: user.userType,
+        );
 
         // Navigate to dashboard
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PublicDashboardScreen(),
-            ),
-          );
-        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const PublicDashboardScreen(),
+          ),
+        );
       } catch (e) {
-        print('❌ [ERROR] Login failed with error: $e');
         _showStatusDialog(
           'Login Error',
-          'An error occurred during login. Please check your network connection and try again.',
+          'An error occurred during login: $e',
           'error',
         );
       } finally {

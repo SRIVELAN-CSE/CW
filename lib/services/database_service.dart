@@ -8,8 +8,6 @@ import '../models/need_request.dart';
 import '../models/feedback.dart';
 import '../models/certificate.dart';
 import '../core/utils/web_storage.dart';
-import '../core/config/environment_switcher.dart';
-import '../core/services/connection_manager.dart';
 import 'backend_api_service.dart';
 
 class DatabaseService {
@@ -43,17 +41,6 @@ class DatabaseService {
   ) async {
     try {
       print('[AUTH] Attempting live authentication for: $email');
-      print('[AUTH] Environment: ${EnvironmentSwitcher.currentEnvironment}');
-      print('[AUTH] Backend URL: ${EnvironmentSwitcher.baseUrl}');
-
-      // Test backend connection first
-      print('[CONN] Testing backend connection...');
-      await ConnectionManager.wakeUpRenderService();
-      
-      if (!await ConnectionManager.testBackendConnection(maxRetries: 3)) {
-        print('[ERROR] Backend connection failed - falling back to local auth');
-        return null;
-      }
 
       final response = await _backendApi.login(email, password);
 
@@ -76,7 +63,7 @@ class DatabaseService {
         print('[SUCCESS] Live authentication successful!');
         print('User: ${userInfo['name']} (${userInfo['user_type']})');
         print('Department: ${userInfo['department']}');
-        print('Environment: ${EnvironmentSwitcher.currentEnvironment}');
+        print('Full user info: $userInfo');
 
         return {'success': true, 'user': userInfo, 'token': token};
       }
@@ -279,109 +266,48 @@ class DatabaseService {
   // Save a new report
   Future<void> saveReport(Report report) async {
     try {
-      await EnvironmentSwitcher.initialize();
-      print('📝 [REPORT] Saving report with real-time backend synchronization...');
-      print('🌐 [ENV] Current environment: ${EnvironmentSwitcher.currentEnvironment}');
-      print('🌐 [ENV] Backend URL: ${EnvironmentSwitcher.baseUrl}');
-      print('🚀 [MODE] Production mode: ${EnvironmentSwitcher.isProduction}');
-      
-      // First, try to save to backend database for real-time sync
-      bool backendSaveSuccess = false;
-      
-      // In production mode, be more aggressive about backend saving
-      if (EnvironmentSwitcher.isProduction) {
-        print('� [PRODUCTION] Production mode - prioritizing backend database');
-        
-        // Try multiple backend save methods in production
-        try {
-          print('🔍 [BACKEND] Method 1: Trying authenticated save...');
-          final token = await getAuthToken();
-          if (token != null) {
-            final backendResult = await BackendApiService.createReportAuthenticated(
-              token: token,
-              report: report,
-            );
-            if (backendResult != null) {
-              print('✅ [BACKEND] Report successfully saved to production database!');
-              print('🔍 [BACKEND] Backend Report ID: ${backendResult['id']}');
-              backendSaveSuccess = true;
-            }
-          }
-        } catch (e1) {
-          print('⚠️ [BACKEND] Method 1 failed: $e1');
-        }
-        
-        // If authenticated method failed, try unauthenticated
-        if (!backendSaveSuccess) {
-          try {
-            print('🔍 [BACKEND] Method 2: Trying unauthenticated save...');
-            final backendResult = await BackendApiService.createReport(report);
-            if (backendResult != null) {
-              print('✅ [BACKEND] Report saved to production database (unauthenticated)!');
-              backendSaveSuccess = true;
-            }
-          } catch (e2) {
-            print('⚠️ [BACKEND] Method 2 failed: $e2');
-          }
-        }
-        
-        if (backendSaveSuccess) {
-          print('🎉 [SUCCESS] Report successfully stored in MongoDB Atlas via Render!');
-        } else {
-          print('❌ [ERROR] All backend save methods failed in production mode');
-          print('⚠️ [FALLBACK] Saving to localStorage as backup');
-        }
-      } else {
-        // Development mode - normal flow
-        try {
-          print('🔍 [BACKEND] Attempting authenticated report save...');
-          final token = await getAuthToken();
-          if (token != null) {
-            final backendResult = await BackendApiService.createReportAuthenticated(
-              token: token,
-              report: report,
-            );
-            if (backendResult != null) {
-              print('✅ [BACKEND] Report successfully saved to backend database!');
-              backendSaveSuccess = true;
-            }
-          } else {
-            final backendResult = await BackendApiService.createReport(report);
-            if (backendResult != null) {
-              print('✅ [BACKEND] Report saved to backend (fallback method)');
-              backendSaveSuccess = true;
-            }
-          }
-        } catch (e) {
-          print('⚠️ [BACKEND] Backend save failed: $e');
-        }
-      }
-
-      // Save to local storage (always do this for offline capability)
+      // First, save to local storage (existing functionality)
       if (kIsWeb) {
         // Use localStorage for web
-        print('� [LOCAL] Saving report on web platform...');
+        print('🔍 [DEBUG] Saving report on web platform...');
         final reports = await getAllReports();
-        print('� [LOCAL] Current reports count: ${reports.length}');
+        print('🔍 [DEBUG] Current reports count: ${reports.length}');
         reports.add(report);
-        print('� [LOCAL] Reports count after adding new: ${reports.length}');
+        print('🔍 [DEBUG] Reports count after adding new: ${reports.length}');
         final reportsJson = reports.map((r) => r.toJson()).toList();
-        print('� [LOCAL] JSON data size: ${reportsJson.length} items');
+        print('🔍 [DEBUG] JSON data size: ${reportsJson.length} items');
         final saveResult = WebStorage.setList('reports', reportsJson);
-        print('� [LOCAL] Save result: $saveResult');
+        print('🔍 [DEBUG] Save result: $saveResult');
 
         // Verify the save by reading it back
         final verifyReports = WebStorage.getList('reports');
-        print('� [LOCAL] Verification: localStorage has ${verifyReports?.length ?? 0} reports');
+        print(
+          '🔍 [DEBUG] Verification: localStorage has ${verifyReports?.length ?? 0} reports',
+        );
       } else {
         // Use SharedPreferences for mobile
-        print('📱 [LOCAL] Saving report on mobile platform...');
         final prefs = await SharedPreferences.getInstance();
         final reports = await getAllReports();
         reports.add(report);
         final reportsJson = reports.map((r) => r.toJson()).toList();
         await prefs.setString(_reportsKey, jsonEncode(reportsJson));
-        print('� [LOCAL] Report saved to mobile storage');
+      }
+
+      // NEW: Also save to backend database
+      try {
+        print('🔍 [BACKEND] Attempting to save report to backend database...');
+        final backendResult = await BackendApiService.createReport(report);
+        if (backendResult != null) {
+          print('✅ [BACKEND] Report successfully saved to SQLite database!');
+          print('🔍 [BACKEND] Backend Report ID: ${backendResult['id']}');
+        } else {
+          print(
+            '⚠️ [BACKEND] Failed to save to backend, but local save succeeded',
+          );
+        }
+      } catch (e) {
+        print('⚠️ [BACKEND] Backend save failed (will retry later): $e');
+        // Don't throw error - local save still succeeded
       }
 
       // Create notification for officers and admins
@@ -392,17 +318,8 @@ class DatabaseService {
         targetRoles: ['officer', 'admin'],
         type: 'NotificationType.newReport',
       );
-
-      if (backendSaveSuccess) {
-        print('🎉 [SUCCESS] Report saved with complete real-time synchronization!');
-        print('📱 [MULTI-DEVICE] Report is now available on all connected devices');
-      } else {
-        print('⚠️ [PARTIAL] Report saved locally, backend sync will retry automatically');
-      }
-
     } catch (e) {
-      print('❌ [ERROR] Critical error saving report: $e');
-      throw e; // Re-throw to let UI handle the error
+      print('Error saving report: $e');
     }
   }
 
@@ -1906,37 +1823,19 @@ class DatabaseService {
   /// Initialize backend connection and sync on app start
   Future<void> initializeBackendSync() async {
     try {
-      await EnvironmentSwitcher.initialize();
       print('🔍 Initializing backend synchronization...');
-      print('🌐 Environment: ${EnvironmentSwitcher.currentEnvironment}');
-      print('📡 Backend URL: ${EnvironmentSwitcher.baseUrl}');
 
-      // Force backend mode when using production environment
-      if (EnvironmentSwitcher.isProduction) {
-        print('🚀 Production mode detected - forcing backend database usage');
-        print('✅ Backend database connection enforced for production');
-        
-        // Try to sync local data to backend
-        try {
-          await syncToBackend();
-          print('🔄 Local data synced to backend database');
-        } catch (syncError) {
-          print('⚠️ Sync error (will retry later): $syncError');
-        }
-        return;
-      }
-
-      // For development, test connection first
       final isConnected = await testBackendConnection();
       if (isConnected) {
         print('✅ Backend database connected successfully');
+
+        // Auto-sync local data to backend
         await syncToBackend();
       } else {
         print('⚠️ Backend database not available - using local storage only');
       }
     } catch (e) {
       print('❌ Error initializing backend sync: $e');
-      print('🔧 Falling back to backend mode anyway (production)');
     }
   }
 

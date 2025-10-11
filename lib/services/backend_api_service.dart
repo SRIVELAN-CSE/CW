@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/report.dart';
-import '../core/config/environment_switcher.dart';
+import 'environment_service.dart';
 
 class BackendApiService {
-  // Dynamic base URL from environment switcher
-  static String get baseUrl => EnvironmentSwitcher.baseUrl;
+  // Dynamic base URL from environment service
+  static String get baseUrl => EnvironmentService.instance.currentConfig.apiURL;
 
   // Headers for API requests
   static const Map<String, String> headers = {
@@ -13,34 +13,17 @@ class BackendApiService {
     'Accept': 'application/json',
   };
 
-  /// Test backend connection
-  static Future<bool> testConnection() async {
-    try {
-      print('🔍 Testing connection to: $baseUrl');
-      final response = await http
-          .get(Uri.parse('$baseUrl/health'))
-          .timeout(const Duration(seconds: 5));
-      
-      if (response.statusCode == 200) {
-        print('✅ Backend connection successful');
-        return true;
-      } else {
-        print('❌ Backend connection failed: ${response.statusCode}');
-        return false;
-      }
-    } catch (e) {
-      print('❌ Backend connection error: $e');
-      return false;
-    }
+  /// Initialize the service with environment settings
+  static Future<void> initialize() async {
+    await EnvironmentService.instance.initialize();
+    print('🔄 Backend service initialized with ${EnvironmentService.instance.currentEnvironment} server');
+    print('🌐 Using API URL: $baseUrl');
   }
 
   /// 🔐 AUTHENTICATE USER (LOGIN)
   Future<Map<String, dynamic>?> login(String email, String password) async {
     try {
-      await EnvironmentSwitcher.initialize();
       print('🔐 Attempting login for: $email');
-      print('🌐 Using server: $baseUrl');
-      print('🔧 Environment: ${EnvironmentSwitcher.currentEnvironment}');
 
       final response = await http
           .post(
@@ -48,14 +31,13 @@ class BackendApiService {
             headers: headers,
             body: jsonEncode({'email': email, 'password': password}),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 10));
 
       print('🔍 Login response status: ${response.statusCode}');
-      print('🔍 Login response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Login successful with ${EnvironmentSwitcher.currentEnvironment}!');
+        print('✅ Login successful!');
         return data;
       } else {
         print('❌ Login failed: ${response.body}');
@@ -63,7 +45,6 @@ class BackendApiService {
       }
     } catch (e) {
       print('🚨 Login error: $e');
-      print('🔧 Current environment: ${EnvironmentSwitcher.currentEnvironment}');
       return null;
     }
   }
@@ -79,65 +60,57 @@ class BackendApiService {
     String? department,
   }) async {
     try {
-      await EnvironmentSwitcher.initialize();
       print('📝 Registering user: $email');
-      print('👤 User type: $userType');
-      print('🏢 Department: ${department ?? 'others'}');
-      print('🌐 Using server: $baseUrl');
-
-      final requestBody = {
-        'name': name,
-        'email': email,
-        'password': password,
-        'phone': phone,
-        'location': location,
-        'userType': userType.toLowerCase(),
-        'user_type': userType.toLowerCase(),
-        'department': department ?? 'others',
-      };
-
-      print('📤 Request body: ${jsonEncode(requestBody)}');
 
       final response = await http
           .post(
             Uri.parse('$baseUrl/auth/register'),
             headers: headers,
-            body: jsonEncode(requestBody),
+            body: jsonEncode({
+              'name': name,
+              'email': email,
+              'password': password,
+              'phone': phone,
+              'location': location,
+              'user_type': userType.toLowerCase(),
+              'department': department ?? 'others',
+            }),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 10));
 
       print('🔍 Registration response status: ${response.statusCode}');
-      print('🔍 Registration response body: ${response.body}');
 
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body);
         print('✅ Registration successful!');
-        if (userType.toLowerCase() == 'officer') {
-          print('👮‍♂️ Officer registration request submitted for approval');
-        }
         return data;
       } else {
-        print('❌ Registration failed with status ${response.statusCode}');
-        print('❌ Response body: ${response.body}');
-        try {
-          final errorData = jsonDecode(response.body);
-          return {'error': errorData['message'] ?? 'Registration failed'};
-        } catch (e) {
-          return {'error': 'Registration failed with status ${response.statusCode}'};
-        }
+        print('❌ Registration failed: ${response.body}');
+        return null;
       }
     } catch (e) {
       print('🚨 Registration error: $e');
-      return {'error': 'Network error during registration: $e'};
+      return null;
     }
   }
 
+  /// Test if backend server is running
+  static Future<bool> testConnection() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/health'), headers: headers)
+          .timeout(const Duration(seconds: 5));
 
+      return response.statusCode == 200;
+    } catch (e) {
+      print('🔍 Backend connection test failed: $e');
+      return false;
+    }
+  }
 
   /// Create a new report in the backend database
   static Future<Map<String, dynamic>?> createReport(Report report) async {
     try {
-      await EnvironmentSwitcher.initialize();
       print('🔍 Sending report to backend database...');
       print('🌐 Using server: $baseUrl');
 
@@ -196,13 +169,21 @@ class BackendApiService {
       print('🔍 Fetching reports from backend database...');
 
       final response = await http
-          .get(Uri.parse('$baseUrl/reports/simple'), headers: headers)
+          .get(Uri.parse('$baseUrl/reports/'), headers: headers)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        print('✅ Fetched ${data.length} reports from backend');
-        return data.cast<Map<String, dynamic>>();
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        
+        // Handle the API response structure: { success: true, data: { reports: [...], pagination: {...} } }
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final List<dynamic> reports = responseData['data']['reports'] ?? [];
+          print('✅ Fetched ${reports.length} reports from backend');
+          return reports.cast<Map<String, dynamic>>();
+        } else {
+          print('❌ Invalid response format from backend');
+          return [];
+        }
       } else {
         print('❌ Failed to fetch reports: ${response.statusCode}');
         return [];
@@ -401,276 +382,4 @@ class BackendApiService {
       return false;
     }
   }
-
-  /// Create report with authentication
-  static Future<Map<String, dynamic>?> createReportAuthenticated({
-    required String token,
-    required Report report,
-  }) async {
-    try {
-      final authenticatedHeaders = {
-        ...headers,
-        'Authorization': 'Bearer $token',
-      };
-
-      final reportData = {
-        'title': report.title,
-        'description': report.description,
-        'category': report.category,
-        'location': report.location,
-        'address': report.address,
-        'latitude': report.latitude,
-        'longitude': report.longitude,
-        'priority': report.priority.toString().split('.').last.toLowerCase(),
-        'department': report.department,
-        'reporter_name': report.reporterName,
-        'reporter_email': report.reporterEmail,
-        'reporter_phone': report.reporterPhone,
-        'image_urls': report.imageUrls,
-        'video_urls': report.videoUrls,
-      };
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/reports/'),
-            headers: authenticatedHeaders,
-            body: json.encode(reportData),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 201) {
-        print('✅ Report created successfully in backend');
-        return json.decode(response.body);
-      } else {
-        print('❌ Failed to create report: ${response.statusCode} - ${response.body}');
-        return null;
-      }
-    } catch (e) {
-      print('❌ Error creating authenticated report: $e');
-      return null;
-    }
-  }
-
-  /// Create feedback with authentication
-  static Future<Map<String, dynamic>?> createFeedback({
-    required String token,
-    required String type,
-    required String message,
-    required String title,
-    required int rating,
-    String? reportId,
-  }) async {
-    try {
-      final authenticatedHeaders = {
-        ...headers,
-        'Authorization': 'Bearer $token',
-      };
-
-      final feedbackData = {
-        'type': type,
-        'message': message,
-        'title': title,
-        'rating': rating,
-        'report_id': reportId,
-      };
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/feedback/'),
-            headers: authenticatedHeaders,
-            body: json.encode(feedbackData),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 201) {
-        print('✅ Feedback created successfully in backend');
-        return json.decode(response.body);
-      } else {
-        print('❌ Failed to create feedback: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('❌ Error creating feedback: $e');
-      return null;
-    }
-  }
-
-  /// ========== PUBLIC METHODS (NO AUTH REQUIRED) ==========
-  
-  /// Create certificate application (Public)
-  static Future<Map<String, dynamic>?> createCertificatePublic({
-    required String certificateType,
-    required String applicantName,
-    required String applicantEmail,
-    required String applicantPhone,
-    required Map<String, dynamic> applicationDetails,
-    String priority = 'Normal',
-  }) async {
-    try {
-      await EnvironmentSwitcher.initialize();
-      print('📜 Creating public certificate application...');
-      print('🌐 Using server: $baseUrl');
-
-      final certificateData = {
-        'certificateType': certificateType,
-        'applicantName': applicantName,
-        'applicantEmail': applicantEmail,
-        'applicantPhone': applicantPhone,
-        'applicationDetails': applicationDetails,
-        'priority': priority,
-      };
-
-      print('📤 Sending certificate data: ${json.encode(certificateData)}');
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/certificates/public'),
-            headers: headers,
-            body: json.encode(certificateData),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      print('🔍 Certificate creation response status: ${response.statusCode}');
-      print('🔍 Certificate creation response body: ${response.body}');
-
-      if (response.statusCode == 201) {
-        print('✅ Certificate application submitted to backend database!');
-        return json.decode(response.body);
-      } else {
-        print('❌ Failed to submit certificate application: ${response.statusCode}');
-        try {
-          final errorData = json.decode(response.body);
-          return {'error': errorData['message'] ?? 'Failed to submit certificate application'};
-        } catch (e) {
-          return {'error': 'Failed to submit certificate application'};
-        }
-      }
-    } catch (e) {
-      print('❌ Error submitting certificate application: $e');
-      return {'error': 'Network error while submitting certificate application: $e'};
-    }
-  }
-
-  /// Create need request (Public)
-  static Future<Map<String, dynamic>?> createNeedRequestPublic({
-    required String title,
-    required String description,
-    required String category,
-    required String location,
-    required String requesterName,
-    required String requesterEmail,
-    required String requesterPhone,
-    String urgencyLevel = 'Medium',
-    int beneficiaryCount = 1,
-    double estimatedCost = 0,
-    String? address,
-  }) async {
-    try {
-      await EnvironmentSwitcher.initialize();
-      print('🤲 Creating public need request...');
-      print('🌐 Using server: $baseUrl');
-
-      final requestData = {
-        'title': title,
-        'description': description,
-        'category': category,
-        'location': location,
-        'address': address,
-        'urgencyLevel': urgencyLevel,
-        'beneficiaryCount': beneficiaryCount,
-        'estimatedCost': estimatedCost,
-        'requesterName': requesterName,
-        'requesterEmail': requesterEmail,
-        'requesterPhone': requesterPhone,
-      };
-
-      print('📤 Sending need request data: ${json.encode(requestData)}');
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/need-requests/public'),
-            headers: headers,
-            body: json.encode(requestData),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      print('🔍 Need request creation response status: ${response.statusCode}');
-      print('🔍 Need request creation response body: ${response.body}');
-
-      if (response.statusCode == 201) {
-        print('✅ Need request submitted to backend database!');
-        return json.decode(response.body);
-      } else {
-        print('❌ Failed to submit need request: ${response.statusCode}');
-        try {
-          final errorData = json.decode(response.body);
-          return {'error': errorData['message'] ?? 'Failed to submit need request'};
-        } catch (e) {
-          return {'error': 'Failed to submit need request'};
-        }
-      }
-    } catch (e) {
-      print('❌ Error submitting need request: $e');
-      return {'error': 'Network error while submitting need request: $e'};
-    }
-  }
-
-  /// Create feedback (Public)
-  static Future<Map<String, dynamic>?> createFeedbackPublic({
-    required String type,
-    required String message,
-    required String userName,
-    required String userEmail,
-    String? title,
-    int? rating,
-    String category = 'General',
-    bool isAnonymous = false,
-  }) async {
-    try {
-      await EnvironmentSwitcher.initialize();
-      print('💬 Creating public feedback...');
-      print('🌐 Using server: $baseUrl');
-
-      final feedbackData = {
-        'type': type,
-        'title': title,
-        'message': message,
-        'rating': rating,
-        'category': category,
-        'userName': userName,
-        'userEmail': userEmail,
-        'isAnonymous': isAnonymous,
-      };
-
-      print('📤 Sending feedback data: ${json.encode(feedbackData)}');
-
-      final response = await http
-          .post(
-            Uri.parse('$baseUrl/feedback/public'),
-            headers: headers,
-            body: json.encode(feedbackData),
-          )
-          .timeout(const Duration(seconds: 15));
-
-      print('🔍 Feedback creation response status: ${response.statusCode}');
-      print('🔍 Feedback creation response body: ${response.body}');
-
-      if (response.statusCode == 201) {
-        print('✅ Feedback submitted to backend database!');
-        return json.decode(response.body);
-      } else {
-        print('❌ Failed to submit feedback: ${response.statusCode}');
-        try {
-          final errorData = json.decode(response.body);
-          return {'error': errorData['message'] ?? 'Failed to submit feedback'};
-        } catch (e) {
-          return {'error': 'Failed to submit feedback'};
-        }
-      }
-    } catch (e) {
-      print('❌ Error submitting feedback: $e');
-      return {'error': 'Network error while submitting feedback: $e'};
-    }
-  }
-
 }

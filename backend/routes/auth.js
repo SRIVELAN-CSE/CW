@@ -20,21 +20,7 @@ const generateToken = (id) => {
 // @access  Public
 router.post('/register', validate(userSchemas.register), async (req, res) => {
   try {
-    const { name, email, phone, password, userType, user_type, location, department, reason } = req.body;
-    
-    console.log('📝 Registration request received:', {
-      name,
-      email,
-      phone: phone ? '***' + phone.slice(-4) : 'not provided',
-      userType,
-      user_type,
-      location,
-      department
-    });
-    
-    // Handle both userType and user_type from frontend
-    const finalUserType = userType || user_type || 'public';
-    console.log('👤 Final user type determined:', finalUserType);
+    const { name, email, phone, password, userType, location, department, reason } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -59,7 +45,7 @@ router.post('/register', validate(userSchemas.register), async (req, res) => {
     }
 
     // For public users, create user directly
-    if (finalUserType === 'public') {
+    if (userType === 'public') {
       const user = await User.create({
         name,
         email,
@@ -91,56 +77,30 @@ router.post('/register', validate(userSchemas.register), async (req, res) => {
       });
     } else {
       // For officers, create registration request
-      console.log('👮‍♂️ Creating registration request for officer:', finalUserType);
-      
       const registrationRequest = await RegistrationRequest.create({
         name,
         email,
         phone,
-        userType: finalUserType,
+        userType,
         location,
-        department: department || 'others',
-        reason: reason || `Request for ${finalUserType} account registration`
+        department,
+        reason: reason || `Request for ${userType} account registration`
       });
-
-      console.log('✅ Registration request created:', registrationRequest._id);
 
       res.status(201).json({
         success: true,
         message: 'Registration request submitted successfully. Please wait for admin approval.',
         data: {
           requestId: registrationRequest._id,
-          status: registrationRequest.status,
-          userType: finalUserType,
-          department: department || 'others'
+          status: registrationRequest.status
         }
       });
     }
   } catch (error) {
-    console.error('❌ Registration error:', error);
-    console.error('❌ Request body was:', req.body);
-    
-    // Check for specific validation errors
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: error.errors
-      });
-    }
-    
-    // Check for duplicate key errors
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already exists'
-      });
-    }
-    
+    console.error('Registration error:', error);
     res.status(500).json({
       success: false,
-      message: 'Registration failed. Please try again.',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      message: 'Registration failed. Please try again.'
     });
   }
 });

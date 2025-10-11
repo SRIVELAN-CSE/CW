@@ -22,10 +22,6 @@ const passwordResetRoutes = require('./routes/passwordReset');
 const needRequestRoutes = require('./routes/needRequests');
 const certificateRoutes = require('./routes/certificates');
 const feedbackRoutes = require('./routes/feedback');
-const dashboardRoutes = require('./routes/dashboard');
-const adminRoutes = require('./routes/admin');
-const searchRoutes = require('./routes/search');
-const flutterFixesRoutes = require('./routes/flutter-fixes');
 
 // Import middleware
 const { authenticate, authorize } = require('./middleware/auth');
@@ -56,39 +52,23 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS configuration - Flutter Web friendly
+// CORS configuration
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    // Allow all localhost and 127.0.0.1 origins for development
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    // Allow requests from localhost on any port during development
+    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
       return callback(null, true);
     }
-    
-    // Allow production domains
-    const allowedOrigins = [
-      'https://civic-welfare-backend.onrender.com',
-      'https://civic-welfare-frontend.onrender.com'
-    ];
-    
+    // Also allow configured origins from environment
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'Access-Control-Allow-Origin',
-    'Access-Control-Allow-Headers',
-    'Access-Control-Allow-Methods',
-    'Access-Control-Allow-Credentials'
-  ]
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Body parsing middleware
@@ -147,10 +127,7 @@ app.get('/', (req, res) => {
       passwordReset: '/api/password-reset',
       needRequests: '/api/need-requests',
       certificates: '/api/certificates',
-      feedback: '/api/feedback',
-      dashboard: '/api/dashboard',
-      admin: '/api/admin',
-      search: '/api/search'
+      feedback: '/api/feedback'
     }
   });
 });
@@ -165,10 +142,6 @@ app.use('/api/password-reset', passwordResetRoutes);
 app.use('/api/need-requests', needRequestRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/feedback', feedbackRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/search', searchRoutes);
-app.use('/api/flutter', flutterFixesRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

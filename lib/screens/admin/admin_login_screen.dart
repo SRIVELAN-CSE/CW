@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'admin_dashboard_screen.dart';
-import '../../services/database_service.dart';
-import '../../core/config/environment_switcher.dart';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -32,81 +30,24 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         _isLoading = true;
       });
 
-      try {
-        final email = _adminIdController.text.trim();
-        final password = _passwordController.text.trim();
-        final securityCode = _securityCodeController.text.trim();
-        
-        print('🔐 [ADMIN LOGIN] Starting secure authentication process...');
-        print('🌐 [ENV] Current environment: ${EnvironmentSwitcher.currentEnvironment}');
-        print('🌐 [ENV] Backend URL: ${EnvironmentSwitcher.baseUrl}');
-        print('🔒 [SECURITY] Security code provided: ${securityCode.isNotEmpty}');
+      // Simulate API call
+      await Future.delayed(const Duration(seconds: 2));
 
-        // Validate security code first
-        if (securityCode != 'ADMIN123') {
-          _showErrorDialog('Invalid Security Code', 'Please enter the correct admin security code.');
-          return;
-        }
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
 
-        // Authenticate admin with backend
-        final authResult = await DatabaseService.instance.authenticateUser(email, password);
-
-        if (authResult == null) {
-          print('❌ [LOGIN] Authentication failed for admin: $email');
-          _showErrorDialog('Login Failed', 'Invalid credentials. Please check your email and password.');
-          return;
-        }
-
-        final user = authResult['user'];
-        print('✅ [LOGIN] Authentication successful for admin: ${user['name']}');
-        print('👤 [USER] Role: ${user['user_type']}, ID: ${user['id']}');
-
-        // Check if user is actually an admin
-        if (user['user_type'] != 'admin') {
-          print('❌ [ACCESS] User role mismatch - expected admin, got: ${user['user_type']}');
-          _showErrorDialog('Access Denied', 'This account does not have administrator privileges.');
-          return;
-        }
-
-        print('🔄 [SESSION] Admin session saved successfully');
-        print('🎉 [SUCCESS] Admin login complete - redirecting to control panel');
-
-        // Navigate to admin dashboard
-        if (mounted) {
+          // TODO: Replace with real authentication logic
+          // For now, always navigate to dashboard for testing
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => const AdminDashboardScreen(),
             ),
           );
-        }
-      } catch (e) {
-        print('❌ [ERROR] Admin login failed with error: $e');
-        _showErrorDialog('Login Error', 'An error occurred during login. Please check your network connection and try again.');
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
       }
     }
-  }
-
-  void _showErrorDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override

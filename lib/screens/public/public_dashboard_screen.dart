@@ -11,6 +11,9 @@ import 'need_request_screen.dart';
 import 'public_profile_screen.dart';
 import 'certificates_screen.dart';
 import '../../widgets/feedback_dialog.dart';
+import '../../widgets/server_status_indicator.dart';
+import '../../widgets/server_switch_widget.dart';
+import '../../widgets/quick_server_switch_dialog.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
@@ -59,11 +62,26 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         actions: [
+          // Server Status Indicator
+          const ServerStatusIndicator(),
           FutureBuilder<Map<String, String>?>(
             future: DatabaseService.instance.getCurrentUserSession(),
             builder: (context, snapshot) {
               final userId = snapshot.data?['userId'] ?? 'anonymous';
               return NotificationWidget(userRole: 'citizen', userId: userId);
+            },
+          ),
+          // Server Settings Button
+          IconButton(
+            icon: const Icon(Icons.cloud_sync),
+            tooltip: 'Server Settings',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ServerSettingsScreen(),
+                ),
+              );
             },
           ),
           IconButton(
@@ -75,6 +93,20 @@ class _PublicDashboardScreenState extends State<PublicDashboardScreen> {
         ],
       ),
       body: pages[_selectedIndex],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => const QuickServerSwitchDialog(),
+          );
+        },
+        icon: const Icon(Icons.cloud_sync),
+        label: const Text('Switch Server'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        tooltip: 'Switch between Local and Cloud servers',
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,
