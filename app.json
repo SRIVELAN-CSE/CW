@@ -1,0 +1,41 @@
+{
+  "name": "civic-welfare-sih",
+  "env": {
+    "NODE_ENV": {
+      "description": "Environment mode",
+      "value": "production"
+    },
+    "MONGODB_URI": {
+      "description": "MongoDB Atlas connection string",
+      "value": "mongodb+srv://your_username:your_password@your_cluster.mongodb.net/civic_welfare"
+    },
+    "JWT_SECRET": {
+      "description": "JWT Secret key for authentication",
+      "generator": "secret"
+    },
+    "JWT_REFRESH_SECRET": {
+      "description": "JWT Refresh Secret key",
+      "generator": "secret"
+    },
+    "CORS_ORIGIN": {
+      "description": "CORS allowed origins",
+      "value": "*"
+    },
+    "PORT": {
+      "description": "Port for the application",
+      "value": "10000"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "free"
+    }
+  },
+  "stack": "heroku-20",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ]
+}
